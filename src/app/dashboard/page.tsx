@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import Icon from "@/components/ui/icon"
-import PrimaryButton from "@/components/ui/primary-button"
 import Modal from "@/components/ui/modal"
 
 export default function CustomerDashboard() {

@@ -34,3 +34,107 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+```
+ezeq
+├─ components.json
+├─ dev.db
+├─ drizzle
+│  ├─ 0000_clammy_flatman.sql
+│  └─ meta
+│     ├─ 0000_snapshot.json
+│     └─ _journal.json
+├─ drizzle.config.ts
+├─ eslint.config.mjs
+├─ lib
+│  └─ auth.ts
+├─ next.config.ts
+├─ package-lock.json
+├─ package.json
+├─ postcss.config.mjs
+├─ public
+│  ├─ file.svg
+│  ├─ globe.svg
+│  ├─ next.svg
+│  ├─ vercel.svg
+│  └─ window.svg
+├─ README.md
+├─ src
+│  ├─ app
+│  │  ├─ actions
+│  │  │  ├─ admin.ts
+│  │  │  └─ booking.ts
+│  │  ├─ admin
+│  │  │  ├─ dashboard
+│  │  │  │  └─ page.tsx
+│  │  │  └─ profile
+│  │  │     └─ page.tsx
+│  │  ├─ api
+│  │  │  ├─ admin
+│  │  │  │  └─ shop-profile
+│  │  │  │     └─ route.ts
+│  │  │  ├─ auth
+│  │  │  │  ├─ register
+│  │  │  │  │  └─ route.ts
+│  │  │  │  └─ [...nextauth]
+│  │  │  │     └─ route.ts
+│  │  │  └─ upload
+│  │  │     └─ route.ts
+│  │  ├─ auth
+│  │  │  ├─ login
+│  │  │  │  └─ page.tsx
+│  │  │  └─ register
+│  │  │     └─ page.tsx
+│  │  ├─ booking
+│  │  │  └─ [salonId]
+│  │  │     └─ [serviceId]
+│  │  │        └─ page.tsx
+│  │  ├─ dashboard
+│  │  │  └─ page.tsx
+│  │  ├─ favicon.ico
+│  │  ├─ globals.css
+│  │  ├─ layout.tsx
+│  │  ├─ page.tsx
+│  │  ├─ providers.tsx
+│  │  └─ superadmin
+│  │     ├─ dashboard
+│  │     │  └─ page.tsx
+│  │     └─ salons
+│  │        └─ page.tsx
+│  ├─ components
+│  │  ├─ auth
+│  │  │  └─ AuthHeader.tsx
+│  │  ├─ dashboard
+│  │  │  ├─ empty-state.tsx
+│  │  │  ├─ stats-card.tsx
+│  │  │  └─ status-badge.tsx
+│  │  ├─ layout
+│  │  │  ├─ admin-sidebar.tsx
+│  │  │  └─ dashboard-header.tsx
+│  │  └─ ui
+│  │     ├─ badge.tsx
+│  │     ├─ button.tsx
+│  │     ├─ calendar.tsx
+│  │     ├─ card.tsx
+│  │     ├─ form-field.tsx
+│  │     ├─ form-input.tsx
+│  │     ├─ form.tsx
+│  │     ├─ icon.tsx
+│  │     ├─ image-upload.tsx
+│  │     ├─ input.tsx
+│  │     ├─ label.tsx
+│  │     ├─ modal.tsx
+│  │     ├─ primary-button.tsx
+│  │     ├─ table.tsx
+│  │     └─ tabs.tsx
+│  ├─ db
+│  │  ├─ index.ts
+│  │  └─ schema.ts
+│  ├─ lib
+│  │  └─ utils.ts
+│  └─ middleware.ts
+├─ tsconfig.json
+└─ types
+   └─ next-auth.d.ts
+
+```

@@ -45,9 +45,7 @@ export default function Home() {
           <div className="absolute bottom-0 left-0 translate-y-1/3 -translate-x-1/3 w-72 h-72 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
 
           <div className="text-center max-w-3xl mx-auto space-y-8 relative z-10">
-            <Badge variant="secondary" className="bg-white border-[#135bec]/20 text-primary px-4 py-1.5 text-sm font-medium rounded-full shadow-xs">
-              Platform Launch v1.0 🚀
-            </Badge>
+          
 
             <h1 className="text-5xl sm:text-6xl md:text-7xl font-extrabold text-neutral-900 tracking-tight leading-[1.1]">
               The smartest way to <br className="hidden sm:block" />
@@ -62,13 +60,13 @@ export default function Home() {
 
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
               <Link href="/auth/register?role=CUSTOMER" className="w-full sm:w-auto">
-                <Button size="lg" className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-white h-14 px-8 text-base shadow-lg shadow-primary/25 rounded-xl transition-all hover:scale-105">
+                <Button size="lg" className="w-full sm:w-auto bg-primary hover:bg-primary/80 text-white h-14 px-8 text-base shadow-lg shadow-primary/15 rounded-xl transition-all">
                   Book an Appointment
                   <ArrowRight className="ml-2 w-5 h-5" />
                 </Button>
               </Link>
               <Link href="/auth/register?role=SALON_ADMIN" className="w-full sm:w-auto">
-                <Button size="lg" variant="outline" className="w-full sm:w-auto h-14 px-8 text-base bg-white hover:bg-slate-50 border-neutral-200 text-neutral-800 rounded-xl transition-all">
+                <Button size="lg" variant="outline" className="w-full sm:w-auto border-primary text-primary hover:bg-primary/80 hover:text-white shadow-lg shadow-primary/15 h-14 px-8 text-base rounded-xl transition-all">
                   Partner your Salon
                 </Button>
               </Link>
