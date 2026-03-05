@@ -1,65 +1,102 @@
 "use strict";
-var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
-    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
-    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
-    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
-    return c > 3 && r && Object.defineProperty(target, key, r), r;
-};
-var __metadata = (this && this.__metadata) || function (k, v) {
-    if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
-};
-var __param = (this && this.__param) || function (paramIndex, decorator) {
-    return function (target, key) { decorator(target, key, paramIndex); }
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.AuthController = void 0;
-const common_1 = require("@nestjs/common");
-const auth_service_1 = require("./auth.service");
-const dto_1 = require("./dto");
-const jwt_auth_guard_1 = require("./jwt-auth.guard");
-const decorators_1 = require("../common/decorators");
-let AuthController = class AuthController {
-    authService;
-    constructor(authService) {
-        this.authService = authService;
+const bcryptjs_1 = __importDefault(require("bcryptjs"));
+const db_1 = require("../database/db");
+const schema_1 = require("../database/schema");
+const drizzle_orm_1 = require("drizzle-orm");
+const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
+const env_1 = require("../config/env");
+const SALT_ROUNDS = 10;
+class AuthController {
+    static async register(req, res) {
+        const { name, email, password, role } = req.body ?? {};
+        try {
+            if (!email || !password) {
+                return res.status(400).json({ message: 'Email and password are required' });
+            }
+            const existing = await db_1.db.select().from(schema_1.users).where((0, drizzle_orm_1.eq)(schema_1.users.email, email));
+            if (existing.length > 0) {
+                return res.status(409).json({ message: 'Email is already registered' });
+            }
+            const hashedPassword = await bcryptjs_1.default.hash(password, SALT_ROUNDS);
+            await db_1.db.insert(schema_1.users).values({
+                name: name || '',
+                email,
+                password: hashedPassword,
+                role: role || 'CUSTOMER',
+            });
+            return res.status(201).json({ message: 'User created successfully' });
+        }
+        catch (err) {
+            console.error(err);
+            return res.status(500).json({ message: 'Internal server error' });
+        }
     }
-    async register(dto) {
-        return this.authService.register(dto);
+    static async login(req, res) {
+        const { email, password } = req.body ?? {};
+        try {
+            if (!email || !password) {
+                return res.status(400).json({ message: 'Email and password are required' });
+            }
+            const result = await db_1.db.select().from(schema_1.users).where((0, drizzle_orm_1.eq)(schema_1.users.email, email));
+            const user = result[0];
+            if (!user) {
+                return res.status(401).json({ message: 'Invalid credentials' });
+            }
+            const storedPassword = user.password;
+            const isBcryptHash = storedPassword.startsWith('$2');
+            const isValidPassword = isBcryptHash
+                ? await bcryptjs_1.default.compare(password, storedPassword)
+                : storedPassword === password;
+            if (!isValidPassword) {
+                return res.status(401).json({ message: 'Invalid credentials' });
+            }
+            if (!isBcryptHash) {
+                const migratedHash = await bcryptjs_1.default.hash(password, SALT_ROUNDS);
+                await db_1.db.update(schema_1.users).set({ password: migratedHash }).where((0, drizzle_orm_1.eq)(schema_1.users.id, user.id));
+            }
+            const payload = { sub: user.id, role: user.role, email: user.email, name: user.name };
+            const token = jsonwebtoken_1.default.sign(payload, env_1.env.jwtSecret, { expiresIn: '1d' });
+            return res.json({
+                access_token: token,
+                user: {
+                    id: user.id,
+                    name: user.name,
+                    email: user.email,
+                    role: user.role,
+                },
+            });
+        }
+        catch (err) {
+            console.error(err);
+            return res.status(500).json({ message: 'Internal server error' });
+        }
     }
-    async login(dto) {
-        return this.authService.login(dto);
+    static async getProfile(req, res) {
+        if (!req.user)
+            return res.status(401).json({ message: 'Unauthorized' });
+        try {
+            const result = await db_1.db.select({
+                id: schema_1.users.id,
+                name: schema_1.users.name,
+                email: schema_1.users.email,
+                role: schema_1.users.role,
+                createdAt: schema_1.users.createdAt,
+            }).from(schema_1.users).where((0, drizzle_orm_1.eq)(schema_1.users.id, req.user.sub));
+            if (result.length === 0) {
+                return res.status(404).json({ message: 'User not found' });
+            }
+            return res.json(result[0]);
+        }
+        catch (err) {
+            console.error(err);
+            return res.status(500).json({ message: 'Internal server error' });
+        }
     }
-    async getProfile(userId) {
-        return this.authService.getProfile(userId);
-    }
-};
+}
 exports.AuthController = AuthController;
-__decorate([
-    (0, common_1.Post)('register'),
-    (0, common_1.HttpCode)(common_1.HttpStatus.CREATED),
-    __param(0, (0, common_1.Body)()),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", [dto_1.RegisterDto]),
-    __metadata("design:returntype", Promise)
-], AuthController.prototype, "register", null);
-__decorate([
-    (0, common_1.Post)('login'),
-    (0, common_1.HttpCode)(common_1.HttpStatus.OK),
-    __param(0, (0, common_1.Body)()),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", [dto_1.LoginDto]),
-    __metadata("design:returntype", Promise)
-], AuthController.prototype, "login", null);
-__decorate([
-    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
-    (0, common_1.Get)('me'),
-    __param(0, (0, decorators_1.CurrentUser)('id')),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String]),
-    __metadata("design:returntype", Promise)
-], AuthController.prototype, "getProfile", null);
-exports.AuthController = AuthController = __decorate([
-    (0, common_1.Controller)('auth'),
-    __metadata("design:paramtypes", [auth_service_1.AuthService])
-], AuthController);
 //# sourceMappingURL=auth.controller.js.map

@@ -1,7 +1,9 @@
 import app from './app';
+import { env } from './config/env';
 
-const PORT = process.env.PORT || 4000;
+const PORT = env.port;
 
 app.listen(PORT, () => {
-  console.log(`🚀 EzeQ Express backend running on http://localhost:${PORT}`);
+  console.log(`EzeQ backend running on http://localhost:${PORT}`);
 });
+

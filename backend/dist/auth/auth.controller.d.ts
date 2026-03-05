@@ -1,25 +1,7 @@
-import { AuthService } from './auth.service';
-import { RegisterDto, LoginDto } from './dto';
+import { Request, Response } from 'express';
+import { AuthRequest } from '../middleware/auth.middleware';
 export declare class AuthController {
-    private readonly authService;
-    constructor(authService: AuthService);
-    register(dto: RegisterDto): Promise<{
-        message: string;
-    }>;
-    login(dto: LoginDto): Promise<{
-        access_token: string;
-        user: {
-            id: string;
-            name: string | null;
-            email: string;
-            role: string;
-        };
-    }>;
-    getProfile(userId: string): Promise<{
-        id: string;
-        name: string | null;
-        email: string;
-        role: string;
-        createdAt: Date;
-    }>;
+    static register(req: Request, res: Response): Promise<Response<any, Record<string, any>>>;
+    static login(req: Request, res: Response): Promise<Response<any, Record<string, any>>>;
+    static getProfile(req: AuthRequest, res: Response): Promise<Response<any, Record<string, any>>>;
 }

@@ -1,42 +1,33 @@
 import express from 'express';
 import cors from 'cors';
-import dotenv from 'dotenv';
-
-// Import routes
-import authRoutes from './auth/auth.routes';
-import salonRoutes from './salons/salons.routes';
-import serviceRoutes from './services/services.routes';
-import hourRoutes from './hours/hours.routes';
-import appointmentRoutes from './appointments/appointments.routes';
-import userRoutes from './users/users.routes';
-// import adminSalonRoutes from './admin-salons/admin-salons.routes';
-
-dotenv.config();
+import v1Router from './routes/v1';
+import { env } from './config/env';
+import { errorHandler } from './shared/middleware/error-handler';
+import { notFoundHandler } from './shared/middleware/not-found';
 
 const app = express();
 
 // Middleware
 app.use(cors({
-    origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+    origin: env.frontendUrl,
     credentials: true,
 }));
 app.use(express.json());
 
 // Routes
-app.use('/auth', authRoutes);
-app.use('/salons', salonRoutes);
-app.use('/salons', serviceRoutes);
-app.use('/salons', hourRoutes);
-app.use('/appointments', appointmentRoutes);
-app.use('/users', userRoutes);
-// app.use('/admin-salons', adminSalonRoutes);
+app.use('/api/v1', v1Router);
+app.use('/', v1Router);
 
 // Basic health check
 app.get('/', (req, res) => {
     res.json({
-        message: 'EzeQ Express Backend is running',
+        message: 'EzeQ backend is running',
+        version: 'v1',
         timestamp: new Date().toISOString()
     });
 });
+
+app.use(notFoundHandler);
+app.use(errorHandler);
 
 export default app;

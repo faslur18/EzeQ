@@ -1,54 +1,56 @@
 "use strict";
-var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
-    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
-    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
-    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
-    return c > 3 && r && Object.defineProperty(target, key, r), r;
-};
-var __metadata = (this && this.__metadata) || function (k, v) {
-    if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
-};
-var __param = (this && this.__param) || function (paramIndex, decorator) {
-    return function (target, key) { decorator(target, key, paramIndex); }
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.AdminSalonsController = void 0;
-const common_1 = require("@nestjs/common");
-const admin_salons_service_1 = require("./admin-salons.service");
-const jwt_auth_guard_1 = require("../auth/jwt-auth.guard");
-const guards_1 = require("../common/guards");
-const decorators_1 = require("../common/decorators");
-let AdminSalonsController = class AdminSalonsController {
-    adminSalonsService;
-    constructor(adminSalonsService) {
-        this.adminSalonsService = adminSalonsService;
+const db_1 = require("../database/db");
+const schema_1 = require("../database/schema");
+const drizzle_orm_1 = require("drizzle-orm");
+class AdminSalonsController {
+    static async findAll(req, res) {
+        try {
+            const result = await db_1.db
+                .select({
+                id: schema_1.salons.id,
+                name: schema_1.salons.name,
+                address: schema_1.salons.address,
+                rating: schema_1.salons.rating,
+                isActive: schema_1.salons.isActive,
+                status: schema_1.salons.status,
+                adminId: schema_1.salons.adminId,
+                adminName: schema_1.users.name,
+                adminEmail: schema_1.users.email,
+            })
+                .from(schema_1.salons)
+                .leftJoin(schema_1.users, (0, drizzle_orm_1.eq)(schema_1.salons.adminId, schema_1.users.id))
+                .orderBy((0, drizzle_orm_1.asc)(schema_1.salons.status));
+            return res.json(result);
+        }
+        catch (err) {
+            console.error(err);
+            return res.status(500).json({ message: 'Internal server error' });
+        }
     }
-    async findAll() {
-        return this.adminSalonsService.findAll();
+    static async updateStatus(req, res) {
+        const id = req.params.id;
+        const { status } = req.body;
+        try {
+            const salonArr = await db_1.db.select().from(schema_1.salons).where((0, drizzle_orm_1.eq)(schema_1.salons.id, id));
+            if (salonArr.length === 0)
+                return res.status(404).json({ message: 'Salon not found' });
+            if (!['APPROVED', 'REJECTED', 'PENDING'].includes(status)) {
+                return res.status(400).json({ message: 'Invalid status' });
+            }
+            await db_1.db
+                .update(schema_1.salons)
+                .set({ status, isActive: status === 'APPROVED' })
+                .where((0, drizzle_orm_1.eq)(schema_1.salons.id, id));
+            const updated = await db_1.db.select().from(schema_1.salons).where((0, drizzle_orm_1.eq)(schema_1.salons.id, id));
+            return res.json(updated[0]);
+        }
+        catch (err) {
+            console.error(err);
+            return res.status(500).json({ message: 'Internal server error' });
+        }
     }
-    async updateStatus(id, status) {
-        return this.adminSalonsService.updateStatus(id, status);
-    }
-};
+}
 exports.AdminSalonsController = AdminSalonsController;
-__decorate([
-    (0, common_1.Get)(),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", []),
-    __metadata("design:returntype", Promise)
-], AdminSalonsController.prototype, "findAll", null);
-__decorate([
-    (0, common_1.Patch)(':id'),
-    __param(0, (0, common_1.Param)('id')),
-    __param(1, (0, common_1.Body)('status')),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, String]),
-    __metadata("design:returntype", Promise)
-], AdminSalonsController.prototype, "updateStatus", null);
-exports.AdminSalonsController = AdminSalonsController = __decorate([
-    (0, common_1.Controller)('admin/salons'),
-    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, guards_1.RolesGuard),
-    (0, decorators_1.Roles)('SUPER_ADMIN'),
-    __metadata("design:paramtypes", [admin_salons_service_1.AdminSalonsService])
-], AdminSalonsController);
 //# sourceMappingURL=admin-salons.controller.js.map

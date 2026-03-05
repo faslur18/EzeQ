@@ -1,92 +1,205 @@
 "use strict";
-var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
-    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
-    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
-    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
-    return c > 3 && r && Object.defineProperty(target, key, r), r;
-};
-var __metadata = (this && this.__metadata) || function (k, v) {
-    if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
-};
-var __param = (this && this.__param) || function (paramIndex, decorator) {
-    return function (target, key) { decorator(target, key, paramIndex); }
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.AppointmentsController = void 0;
-const common_1 = require("@nestjs/common");
-const appointments_service_1 = require("./appointments.service");
-const dto_1 = require("./dto");
-const jwt_auth_guard_1 = require("../auth/jwt-auth.guard");
-const decorators_1 = require("../common/decorators");
-let AppointmentsController = class AppointmentsController {
-    appointmentsService;
-    constructor(appointmentsService) {
-        this.appointmentsService = appointmentsService;
+const db_1 = require("../database/db");
+const schema_1 = require("../database/schema");
+const drizzle_orm_1 = require("drizzle-orm");
+class AppointmentsController {
+    static async findAll(req, res) {
+        if (!req.user)
+            return res.status(401).json({ message: 'Unauthorized' });
+        const { sub: userId, role: userRole } = req.user;
+        try {
+            if (userRole === 'CUSTOMER') {
+                const result = await db_1.db
+                    .select({
+                    appointments: schema_1.appointments,
+                    service: schema_1.services,
+                    salon: schema_1.salons
+                })
+                    .from(schema_1.appointments)
+                    .leftJoin(schema_1.services, (0, drizzle_orm_1.eq)(schema_1.appointments.serviceId, schema_1.services.id))
+                    .leftJoin(schema_1.salons, (0, drizzle_orm_1.eq)(schema_1.appointments.salonId, schema_1.salons.id))
+                    .where((0, drizzle_orm_1.eq)(schema_1.appointments.customerId, userId))
+                    .orderBy((0, drizzle_orm_1.desc)(schema_1.appointments.createdAt));
+                return res.json(result);
+            }
+            if (userRole === 'SALON_ADMIN') {
+                const salonArr = await db_1.db.select().from(schema_1.salons).where((0, drizzle_orm_1.eq)(schema_1.salons.adminId, userId));
+                if (salonArr.length === 0)
+                    return res.json([]);
+                const result = await db_1.db
+                    .select({
+                    appointments: schema_1.appointments,
+                    service: schema_1.services,
+                    customer: schema_1.users
+                })
+                    .from(schema_1.appointments)
+                    .leftJoin(schema_1.services, (0, drizzle_orm_1.eq)(schema_1.appointments.serviceId, schema_1.services.id))
+                    .leftJoin(schema_1.users, (0, drizzle_orm_1.eq)(schema_1.appointments.customerId, schema_1.users.id))
+                    .where((0, drizzle_orm_1.eq)(schema_1.appointments.salonId, salonArr[0].id))
+                    .orderBy((0, drizzle_orm_1.desc)(schema_1.appointments.createdAt));
+                return res.json(result);
+            }
+            if (userRole === 'SUPER_ADMIN') {
+                const result = await db_1.db
+                    .select({
+                    appointments: schema_1.appointments,
+                    service: schema_1.services,
+                    salon: schema_1.salons,
+                    customer: schema_1.users
+                })
+                    .from(schema_1.appointments)
+                    .leftJoin(schema_1.services, (0, drizzle_orm_1.eq)(schema_1.appointments.serviceId, schema_1.services.id))
+                    .leftJoin(schema_1.salons, (0, drizzle_orm_1.eq)(schema_1.appointments.salonId, schema_1.salons.id))
+                    .leftJoin(schema_1.users, (0, drizzle_orm_1.eq)(schema_1.appointments.customerId, schema_1.users.id))
+                    .orderBy((0, drizzle_orm_1.desc)(schema_1.appointments.createdAt));
+                return res.json(result);
+            }
+            return res.status(403).json({ message: 'Forbidden' });
+        }
+        catch (err) {
+            console.error(err);
+            return res.status(500).json({ message: 'Internal server error' });
+        }
     }
-    async findAll(userId, userRole) {
-        return this.appointmentsService.findAll(userId, userRole);
+    static async findOne(req, res) {
+        if (!req.user)
+            return res.status(401).json({ message: 'Unauthorized' });
+        const id = req.params.id;
+        const { sub: userId, role: userRole } = req.user;
+        try {
+            const result = await db_1.db
+                .select({
+                appointments: schema_1.appointments,
+                service: schema_1.services,
+                salon: schema_1.salons
+            })
+                .from(schema_1.appointments)
+                .leftJoin(schema_1.services, (0, drizzle_orm_1.eq)(schema_1.appointments.serviceId, schema_1.services.id))
+                .leftJoin(schema_1.salons, (0, drizzle_orm_1.eq)(schema_1.appointments.salonId, schema_1.salons.id))
+                .where((0, drizzle_orm_1.eq)(schema_1.appointments.id, id));
+            if (result.length === 0)
+                return res.status(404).json({ message: 'Appointment not found' });
+            const appt = result[0];
+            if (userRole === 'CUSTOMER' && appt.appointments.customerId !== userId) {
+                return res.status(403).json({ message: 'Forbidden' });
+            }
+            if (userRole === 'SALON_ADMIN') {
+                const salonArr = await db_1.db.select().from(schema_1.salons).where((0, drizzle_orm_1.eq)(schema_1.salons.adminId, userId));
+                if (salonArr.length === 0 || appt.appointments.salonId !== salonArr[0].id) {
+                    return res.status(403).json({ message: 'Forbidden' });
+                }
+            }
+            return res.json(appt);
+        }
+        catch (err) {
+            console.error(err);
+            return res.status(500).json({ message: 'Internal server error' });
+        }
     }
-    async findOne(id, userId, userRole) {
-        return this.appointmentsService.findOne(id, userId, userRole);
+    static async create(req, res) {
+        if (!req.user)
+            return res.status(401).json({ message: 'Unauthorized' });
+        const { salonId, serviceId, date, startTime } = req.body;
+        try {
+            const salonArr = await db_1.db.select().from(schema_1.salons).where((0, drizzle_orm_1.eq)(schema_1.salons.id, salonId));
+            if (salonArr.length === 0)
+                return res.status(404).json({ message: 'Salon not found' });
+            if (!salonArr[0].isActive || salonArr[0].status !== 'APPROVED') {
+                return res.status(400).json({ message: 'Salon is not available for bookings' });
+            }
+            const serviceArr = await db_1.db
+                .select()
+                .from(schema_1.services)
+                .where((0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema_1.services.id, serviceId), (0, drizzle_orm_1.eq)(schema_1.services.salonId, salonId)));
+            if (serviceArr.length === 0)
+                return res.status(404).json({ message: 'Service not found for this salon' });
+            const existingAppts = await db_1.db
+                .select()
+                .from(schema_1.appointments)
+                .where((0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema_1.appointments.salonId, salonId), (0, drizzle_orm_1.eq)(schema_1.appointments.appointmentDate, date), (0, drizzle_orm_1.eq)(schema_1.appointments.startTime, startTime), (0, drizzle_orm_1.ne)(schema_1.appointments.status, 'CANCELLED')));
+            if (existingAppts.length > 0) {
+                return res.status(409).json({ message: 'Time slot is no longer available' });
+            }
+            await db_1.db.insert(schema_1.appointments).values({
+                customerId: req.user.sub,
+                salonId,
+                serviceId,
+                appointmentDate: date,
+                startTime,
+                status: 'CONFIRMED',
+            });
+            const created = await db_1.db
+                .select()
+                .from(schema_1.appointments)
+                .where((0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema_1.appointments.customerId, req.user.sub), (0, drizzle_orm_1.eq)(schema_1.appointments.salonId, salonId), (0, drizzle_orm_1.eq)(schema_1.appointments.appointmentDate, date), (0, drizzle_orm_1.eq)(schema_1.appointments.startTime, startTime)));
+            return res.status(201).json(created[0]);
+        }
+        catch (err) {
+            console.error(err);
+            return res.status(500).json({ message: 'Internal server error' });
+        }
     }
-    async create(userId, dto) {
-        return this.appointmentsService.create(userId, dto);
+    static async updateStatus(req, res) {
+        if (!req.user)
+            return res.status(401).json({ message: 'Unauthorized' });
+        const id = req.params.id;
+        const { status } = req.body;
+        const { sub: userId, role: userRole } = req.user;
+        try {
+            const apptArr = await db_1.db.select().from(schema_1.appointments).where((0, drizzle_orm_1.eq)(schema_1.appointments.id, id));
+            if (apptArr.length === 0)
+                return res.status(404).json({ message: 'Appointment not found' });
+            const appt = apptArr[0];
+            if (userRole === 'CUSTOMER') {
+                if (appt.customerId !== userId)
+                    return res.status(403).json({ message: 'Forbidden' });
+                if (status !== 'CANCELLED')
+                    return res.status(403).json({ message: 'Customers can only cancel' });
+            }
+            else if (userRole === 'SALON_ADMIN') {
+                const salonArr = await db_1.db.select().from(schema_1.salons).where((0, drizzle_orm_1.eq)(schema_1.salons.adminId, userId));
+                if (salonArr.length === 0 || appt.salonId !== salonArr[0].id) {
+                    return res.status(403).json({ message: 'Forbidden' });
+                }
+            }
+            await db_1.db.update(schema_1.appointments).set({ status }).where((0, drizzle_orm_1.eq)(schema_1.appointments.id, id));
+            const updated = await db_1.db.select().from(schema_1.appointments).where((0, drizzle_orm_1.eq)(schema_1.appointments.id, id));
+            return res.json(updated[0]);
+        }
+        catch (err) {
+            console.error(err);
+            return res.status(500).json({ message: 'Internal server error' });
+        }
     }
-    async updateStatus(id, userId, userRole, dto) {
-        return this.appointmentsService.updateStatus(id, userId, userRole, dto);
+    static async remove(req, res) {
+        if (!req.user)
+            return res.status(401).json({ message: 'Unauthorized' });
+        const id = req.params.id;
+        const { sub: userId, role: userRole } = req.user;
+        try {
+            const apptArr = await db_1.db.select().from(schema_1.appointments).where((0, drizzle_orm_1.eq)(schema_1.appointments.id, id));
+            if (apptArr.length === 0)
+                return res.status(404).json({ message: 'Appointment not found' });
+            const appt = apptArr[0];
+            if (userRole === 'CUSTOMER' && appt.customerId !== userId) {
+                return res.status(403).json({ message: 'Forbidden' });
+            }
+            if (userRole === 'SALON_ADMIN') {
+                const salonArr = await db_1.db.select().from(schema_1.salons).where((0, drizzle_orm_1.eq)(schema_1.salons.adminId, userId));
+                if (salonArr.length === 0 || appt.salonId !== salonArr[0].id) {
+                    return res.status(403).json({ message: 'Forbidden' });
+                }
+            }
+            await db_1.db.update(schema_1.appointments).set({ status: 'CANCELLED' }).where((0, drizzle_orm_1.eq)(schema_1.appointments.id, id));
+            return res.json({ message: 'Appointment cancelled' });
+        }
+        catch (err) {
+            console.error(err);
+            return res.status(500).json({ message: 'Internal server error' });
+        }
     }
-    async remove(id, userId, userRole) {
-        return this.appointmentsService.remove(id, userId, userRole);
-    }
-};
+}
 exports.AppointmentsController = AppointmentsController;
-__decorate([
-    (0, common_1.Get)(),
-    __param(0, (0, decorators_1.CurrentUser)('id')),
-    __param(1, (0, decorators_1.CurrentUser)('role')),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, String]),
-    __metadata("design:returntype", Promise)
-], AppointmentsController.prototype, "findAll", null);
-__decorate([
-    (0, common_1.Get)(':id'),
-    __param(0, (0, common_1.Param)('id')),
-    __param(1, (0, decorators_1.CurrentUser)('id')),
-    __param(2, (0, decorators_1.CurrentUser)('role')),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, String, String]),
-    __metadata("design:returntype", Promise)
-], AppointmentsController.prototype, "findOne", null);
-__decorate([
-    (0, common_1.Post)(),
-    __param(0, (0, decorators_1.CurrentUser)('id')),
-    __param(1, (0, common_1.Body)()),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, dto_1.CreateAppointmentDto]),
-    __metadata("design:returntype", Promise)
-], AppointmentsController.prototype, "create", null);
-__decorate([
-    (0, common_1.Patch)(':id'),
-    __param(0, (0, common_1.Param)('id')),
-    __param(1, (0, decorators_1.CurrentUser)('id')),
-    __param(2, (0, decorators_1.CurrentUser)('role')),
-    __param(3, (0, common_1.Body)()),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, String, String, dto_1.UpdateAppointmentStatusDto]),
-    __metadata("design:returntype", Promise)
-], AppointmentsController.prototype, "updateStatus", null);
-__decorate([
-    (0, common_1.Delete)(':id'),
-    __param(0, (0, common_1.Param)('id')),
-    __param(1, (0, decorators_1.CurrentUser)('id')),
-    __param(2, (0, decorators_1.CurrentUser)('role')),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, String, String]),
-    __metadata("design:returntype", Promise)
-], AppointmentsController.prototype, "remove", null);
-exports.AppointmentsController = AppointmentsController = __decorate([
-    (0, common_1.Controller)('appointments'),
-    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
-    __metadata("design:paramtypes", [appointments_service_1.AppointmentsService])
-], AppointmentsController);
 //# sourceMappingURL=appointments.controller.js.map

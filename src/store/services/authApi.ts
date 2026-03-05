@@ -20,7 +20,7 @@ export const authApi = api.injectEndpoints({
             query: (body) => ({ url: '/auth/register', method: 'POST', body }),
         }),
         getProfile: builder.query<UserProfile, void>({
-            query: () => '/auth/me',
+            query: () => '/auth/profile',
             providesTags: ['Profile'],
         }),
     }),
