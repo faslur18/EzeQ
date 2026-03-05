@@ -1,15 +1,20 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
+import { useSelector } from "react-redux"
 import Link from "next/link"
+import { RootState } from "@/store/store"
 import AuthHeader from "@/components/auth/AuthHeader"
 import FormField from "@/components/ui/form-field"
 import PrimaryButton from "@/components/ui/primary-button"
 import Icon from "@/components/ui/icon"
+import { useRegisterMutation } from "@/store/services/authApi"
+import GuestGuard from "@/components/auth/GuestGuard"
 
-export default function RegisterPage() {
+function RegisterContent() {
     const router = useRouter()
+    const [register] = useRegisterMutation()
     const [firstName, setFirstName] = useState("")
     const [lastName, setLastName] = useState("")
     const [email, setEmail] = useState("")
@@ -24,25 +29,16 @@ export default function RegisterPage() {
         setError("")
 
         try {
-            const res = await fetch("/api/auth/register", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    name: `${firstName} ${lastName}`.trim(),
-                    email,
-                    password,
-                    role
-                }),
-            })
-
-            if (!res.ok) {
-                const data = await res.json()
-                throw new Error(data.error || "Registration failed")
-            }
+            await register({
+                name: `${firstName} ${lastName}`.trim(),
+                email,
+                password,
+                role,
+            }).unwrap()
 
             router.push("/auth/login?registered=true")
-        } catch (error: any) {
-            setError(error.message)
+        } catch (err: any) {
+            setError(err?.data?.message || "Registration failed")
         } finally {
             setLoading(false)
         }
@@ -185,7 +181,7 @@ export default function RegisterPage() {
             </div>
 
             <footer className="mt-8 py-8 text-center text-sm text-slate-400 border-t border-slate-200">
-                <p>© 2024 EzeQ Inc. All rights reserved.</p>
+                <p>© 2026 EzeQ Inc. All rights reserved.</p>
             </footer>
         </div>
     )
@@ -208,5 +204,13 @@ function RoleCard({ icon, label, value, selected, onSelect }: {
             <Icon name={icon} size="xl" className={selected ? "text-primary-foreground" : "text-slate-400 group-hover:text-black"} />
             <span className={`text-sm font-bold ${selected ? 'text-primary-foreground' : 'text-slate-500 group-hover:text-black'}`}>{label}</span>
         </label>
+    )
+}
+
+export default function RegisterPage() {
+    return (
+        <GuestGuard>
+            <RegisterContent />
+        </GuestGuard>
     )
 }

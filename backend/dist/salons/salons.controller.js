@@ -27,6 +27,9 @@ let SalonsController = class SalonsController {
     async findAll() {
         return this.salonsService.findAll();
     }
+    async findMine(userId) {
+        return this.salonsService.findMySalon(userId);
+    }
     async findOne(id) {
         return this.salonsService.findOne(id);
     }
@@ -47,6 +50,15 @@ __decorate([
     __metadata("design:paramtypes", []),
     __metadata("design:returntype", Promise)
 ], SalonsController.prototype, "findAll", null);
+__decorate([
+    (0, common_1.Get)('mine'),
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, guards_1.RolesGuard),
+    (0, decorators_1.Roles)('SALON_ADMIN'),
+    __param(0, (0, decorators_1.CurrentUser)('id')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String]),
+    __metadata("design:returntype", Promise)
+], SalonsController.prototype, "findMine", null);
 __decorate([
     (0, common_1.Get)(':id'),
     __param(0, (0, common_1.Param)('id')),

@@ -1,16 +1,22 @@
 "use client"
 
-import { useState } from "react"
-import { signIn, getSession } from "next-auth/react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
+import { useDispatch, useSelector } from "react-redux"
 import Link from "next/link"
+import { RootState } from "@/store/store"
 import AuthHeader from "@/components/auth/AuthHeader"
 import FormField from "@/components/ui/form-field"
 import PrimaryButton from "@/components/ui/primary-button"
 import Icon from "@/components/ui/icon"
+import { useLoginMutation } from "@/store/services/authApi"
+import { setCredentials } from "@/store/authSlice"
+import GuestGuard from "@/components/auth/GuestGuard"
 
-export default function LoginPage() {
+function LoginContent() {
     const router = useRouter()
+    const dispatch = useDispatch()
+    const [login] = useLoginMutation()
     const [email, setEmail] = useState("")
     const [password, setPassword] = useState("")
     const [loading, setLoading] = useState(false)
@@ -22,29 +28,23 @@ export default function LoginPage() {
         setError("")
 
         try {
-            const res = await signIn("credentials", {
-                redirect: false,
-                email,
-                password,
-            })
+            const result = await login({ email, password }).unwrap()
 
-            if (res?.error) {
-                setError("Invalid email or password")
+            dispatch(setCredentials({
+                token: result.access_token,
+                user: result.user,
+            }))
+
+            const role = result.user.role
+            if (role === "SUPER_ADMIN") {
+                router.push("/superadmin/dashboard")
+            } else if (role === "SALON_ADMIN") {
+                router.push("/admin/dashboard")
             } else {
-                const session = await getSession()
-                const role = (session?.user as any)?.role
-
-                if (role === "SUPER_ADMIN") {
-                    router.push("/superadmin/dashboard")
-                } else if (role === "SALON_ADMIN") {
-                    router.push("/admin/dashboard")
-                } else {
-                    router.push("/dashboard")
-                }
-                router.refresh()
+                router.push("/dashboard")
             }
-        } catch (error) {
-            setError("Something went wrong")
+        } catch (err: any) {
+            setError(err?.data?.message || "Invalid email or password")
         } finally {
             setLoading(false)
         }
@@ -147,3 +147,12 @@ export default function LoginPage() {
         </div>
     )
 }
+
+export default function LoginPage() {
+    return (
+        <GuestGuard>
+            <LoginContent />
+        </GuestGuard>
+    )
+}
+

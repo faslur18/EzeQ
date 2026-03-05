@@ -1,29 +1,17 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { getAllSalonsForAdmin, updateSalonStatus } from "@/app/actions/admin"
+import { useGetAdminSalonsQuery, useUpdateSalonStatusMutation } from "@/store/services/adminSalonsApi"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import AuthGuard from "@/components/auth/AuthGuard"
 
-export default function SuperAdminSalons() {
-    const [salons, setSalons] = useState<any[]>([])
-    const [loading, setLoading] = useState(true)
-
-    const fetchSalons = async () => {
-        setLoading(true)
-        const data = await getAllSalonsForAdmin()
-        setSalons(data)
-        setLoading(false)
-    }
-
-    useEffect(() => {
-        fetchSalons()
-    }, [])
+function SuperAdminSalonsContent() {
+    const { data: salons = [], isLoading } = useGetAdminSalonsQuery()
+    const [updateStatus] = useUpdateSalonStatusMutation()
 
     const handleStatusChange = async (id: string, status: "APPROVED" | "REJECTED") => {
-        await updateSalonStatus(id, status)
-        fetchSalons() // Refresh list
+        await updateStatus({ id, status })
     }
 
     return (
@@ -42,7 +30,7 @@ export default function SuperAdminSalons() {
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {loading ? (
+                        {isLoading ? (
                             <TableRow><TableCell colSpan={5} className="text-center py-8">Loading salons...</TableCell></TableRow>
                         ) : salons.length === 0 ? (
                             <TableRow><TableCell colSpan={5} className="text-center py-8">No salons found.</TableCell></TableRow>
@@ -76,5 +64,13 @@ export default function SuperAdminSalons() {
                 </Table>
             </div>
         </div>
+    )
+}
+
+export default function SuperAdminSalons() {
+    return (
+        <AuthGuard allowedRoles={["SUPER_ADMIN"]}>
+            <SuperAdminSalonsContent />
+        </AuthGuard>
     )
 }

@@ -1,8 +1,15 @@
-import { getDashboardAnalytics } from "@/app/actions/admin"
-import StatsCard from "@/components/dashboard/stats-card"
+"use client"
 
-export default async function SuperAdminDashboard() {
-    const analytics = await getDashboardAnalytics()
+import { useGetUsersQuery } from "@/store/services/usersApi"
+import { useGetAdminSalonsQuery } from "@/store/services/adminSalonsApi"
+import { useGetAppointmentsQuery } from "@/store/services/appointmentsApi"
+import StatsCard from "@/components/dashboard/stats-card"
+import AuthGuard from "@/components/auth/AuthGuard"
+
+function SuperAdminDashboardContent() {
+    const { data: users = [] } = useGetUsersQuery()
+    const { data: salons = [] } = useGetAdminSalonsQuery()
+    const { data: appointments = [] } = useGetAppointmentsQuery()
 
     return (
         <div className="min-h-screen bg-[#f6f6f8] p-6 md:p-8">
@@ -18,24 +25,32 @@ export default async function SuperAdminDashboard() {
                         iconBg="bg-blue-50"
                         iconColor="text-blue-600"
                         label="Total Users"
-                        value={analytics.totalUsers}
+                        value={users.length}
                     />
                     <StatsCard
                         icon="content_cut"
                         iconBg="bg-green-50"
                         iconColor="text-green-600"
                         label="Total Salons"
-                        value={analytics.totalSalons}
+                        value={salons.length}
                     />
                     <StatsCard
                         icon="calendar_month"
                         iconBg="bg-purple-50"
                         iconColor="text-purple-600"
                         label="Appointments"
-                        value={analytics.totalAppointments}
+                        value={appointments.length}
                     />
                 </div>
             </div>
         </div>
+    )
+}
+
+export default function SuperAdminDashboard() {
+    return (
+        <AuthGuard allowedRoles={["SUPER_ADMIN"]}>
+            <SuperAdminDashboardContent />
+        </AuthGuard>
     )
 }

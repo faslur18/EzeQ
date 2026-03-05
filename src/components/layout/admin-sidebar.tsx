@@ -1,11 +1,13 @@
 "use client"
 
 import { useState } from "react"
+import { useDispatch } from "react-redux"
+import { useRouter } from "next/navigation"
 import Link from "next/link"
-import { signOut } from "next-auth/react"
 import Icon from "@/components/ui/icon"
 import PrimaryButton from "@/components/ui/primary-button"
 import Modal from "@/components/ui/modal"
+import { logout } from "@/store/authSlice"
 
 interface NavItem {
     icon: string
@@ -21,9 +23,9 @@ interface AdminSidebarProps {
 
 const navItems: Omit<NavItem, "active">[] = [
     { icon: "dashboard", label: "Dashboard", href: "/admin/dashboard" },
-    { icon: "content_cut", label: "Services", href: "/admin/services" },
-    { icon: "calendar_month", label: "Schedule", href: "/admin/schedule" },
-    { icon: "storefront", label: "Salon Profile", href: "/admin/profile" },
+    { icon: "content_cut", label: "Services", href: "/admin/salon-services" },
+    { icon: "event", label: "Schedule", href: "/admin/schedules" },
+    { icon: "storefront", label: "Salon Profile", href: "/admin/salon-profile" },
 ]
 
 const bottomItems = [
@@ -31,7 +33,14 @@ const bottomItems = [
 ]
 
 export default function AdminSidebar({ salonName, activePath }: AdminSidebarProps) {
+    const dispatch = useDispatch()
+    const router = useRouter()
     const [isSignOutModalOpen, setIsSignOutModalOpen] = useState(false)
+
+    const handleSignOut = () => {
+        dispatch(logout())
+        router.push("/auth/login")
+    }
 
     return (
         <>
@@ -116,7 +125,7 @@ export default function AdminSidebar({ salonName, activePath }: AdminSidebarProp
                 title="Sign Out"
                 description="Are you sure you want to sign out of your account?"
                 primaryActionText="Yes, Sign Out"
-                primaryActionOnClick={() => signOut({ callbackUrl: "/auth/login" })}
+                primaryActionOnClick={handleSignOut}
                 primaryActionClassName="bg-destructive hover:bg-destructive/90 text-white border-destructive"
                 secondaryActionText="Cancel"
                 secondaryActionOnClick={() => setIsSignOutModalOpen(false)}

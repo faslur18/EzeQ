@@ -1,36 +1,101 @@
-import { Controller, Get, Patch, Delete, Param, Body, UseGuards } from '@nestjs/common';
-import { UsersService } from './users.service';
-import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { RolesGuard } from '../common/guards';
-import { Roles, CurrentUser } from '../common/decorators';
+import { Response } from 'express';
+import { db } from '../database/db';
+import { users } from '../database/schema';
+import { eq } from 'drizzle-orm';
+import { AuthRequest } from '../middleware/auth.middleware';
 
-@Controller('users')
-@UseGuards(JwtAuthGuard, RolesGuard)
-@Roles('SUPER_ADMIN')
 export class UsersController {
-    constructor(private readonly usersService: UsersService) { }
-
-    @Get()
-    async findAll() {
-        return this.usersService.findAll();
+    static async findAll(req: any, res: Response) {
+        try {
+            const result = await db
+                .select({
+                    id: users.id,
+                    name: users.name,
+                    email: users.email,
+                    role: users.role,
+                    createdAt: users.createdAt,
+                })
+                .from(users);
+            return res.json(result);
+        } catch (err) {
+            console.error(err);
+            return res.status(500).json({ message: 'Internal server error' });
+        }
     }
 
-    @Get(':id')
-    async findOne(@Param('id') id: string) {
-        return this.usersService.findOne(id);
+    static async findOne(req: any, res: Response) {
+        const id = req.params.id as string;
+        try {
+            const result = await db
+                .select({
+                    id: users.id,
+                    name: users.name,
+                    email: users.email,
+                    role: users.role,
+                    createdAt: users.createdAt,
+                })
+                .from(users)
+                .where(eq(users.id, id));
+
+            if (result.length === 0) return res.status(404).json({ message: 'User not found' });
+            return res.json(result[0]);
+        } catch (err) {
+            console.error(err);
+            return res.status(500).json({ message: 'Internal server error' });
+        }
     }
 
-    @Patch(':id')
-    async updateRole(
-        @Param('id') id: string,
-        @CurrentUser('id') currentUserId: string,
-        @Body('role') role: string,
-    ) {
-        return this.usersService.updateRole(id, currentUserId, role);
+    static async updateRole(req: AuthRequest, res: Response) {
+        if (!req.user) return res.status(401).json({ message: 'Unauthorized' });
+        const id = req.params.id as string;
+        const { role } = req.body;
+        const currentUserId = req.user!.sub;
+
+        if (id === currentUserId) return res.status(400).json({ message: 'Cannot modify your own role' });
+
+        try {
+            const userArr = await db.select().from(users).where(eq(users.id, id));
+            if (userArr.length === 0) return res.status(404).json({ message: 'User not found' });
+
+            if (!['CUSTOMER', 'SALON_ADMIN', 'SUPER_ADMIN'].includes(role)) {
+                return res.status(400).json({ message: 'Invalid role' });
+            }
+
+            await db.update(users).set({ role }).where(eq(users.id, id));
+            const updated = await db
+                .select({
+                    id: users.id,
+                    name: users.name,
+                    email: users.email,
+                    role: users.role,
+                    createdAt: users.createdAt,
+                })
+                .from(users)
+                .where(eq(users.id, id));
+
+            return res.json(updated[0]);
+        } catch (err) {
+            console.error(err);
+            return res.status(500).json({ message: 'Internal server error' });
+        }
     }
 
-    @Delete(':id')
-    async remove(@Param('id') id: string, @CurrentUser('id') currentUserId: string) {
-        return this.usersService.remove(id, currentUserId);
+    static async remove(req: AuthRequest, res: Response) {
+        if (!req.user) return res.status(401).json({ message: 'Unauthorized' });
+        const id = req.params.id as string;
+        const currentUserId = req.user!.sub;
+
+        if (id === currentUserId) return res.status(400).json({ message: 'Cannot delete your own account' });
+
+        try {
+            const userArr = await db.select().from(users).where(eq(users.id, id));
+            if (userArr.length === 0) return res.status(404).json({ message: 'User not found' });
+
+            await db.delete(users).where(eq(users.id, id));
+            return res.json({ message: 'User deleted' });
+        } catch (err) {
+            console.error(err);
+            return res.status(500).json({ message: 'Internal server error' });
+        }
     }
 }

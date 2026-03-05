@@ -31,6 +31,18 @@ let SalonsService = class SalonsService {
             operatingHours: salonHours,
         };
     }
+    async findMySalon(adminId) {
+        const salonArr = await database_module_1.db.select().from(schema_1.salons).where((0, drizzle_orm_1.eq)(schema_1.salons.adminId, adminId));
+        if (salonArr.length === 0)
+            throw new common_1.NotFoundException('Salon not found');
+        const salonServices = await database_module_1.db.select().from(schema_1.services).where((0, drizzle_orm_1.eq)(schema_1.services.salonId, salonArr[0].id));
+        const salonHours = await database_module_1.db.select().from(schema_1.operatingHours).where((0, drizzle_orm_1.eq)(schema_1.operatingHours.salonId, salonArr[0].id));
+        return {
+            ...salonArr[0],
+            services: salonServices,
+            operatingHours: salonHours,
+        };
+    }
     async create(adminId, dto) {
         const existing = await database_module_1.db.select().from(schema_1.salons).where((0, drizzle_orm_1.eq)(schema_1.salons.adminId, adminId));
         if (existing.length > 0) {
