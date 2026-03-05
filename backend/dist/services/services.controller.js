@@ -1,97 +1,132 @@
 "use strict";
-var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
-    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
-    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
-    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
-    return c > 3 && r && Object.defineProperty(target, key, r), r;
-};
-var __metadata = (this && this.__metadata) || function (k, v) {
-    if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
-};
-var __param = (this && this.__param) || function (paramIndex, decorator) {
-    return function (target, key) { decorator(target, key, paramIndex); }
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ServicesController = void 0;
-const common_1 = require("@nestjs/common");
-const services_service_1 = require("./services.service");
-const dto_1 = require("./dto");
-const jwt_auth_guard_1 = require("../auth/jwt-auth.guard");
-const guards_1 = require("../common/guards");
-const decorators_1 = require("../common/decorators");
-let ServicesController = class ServicesController {
-    servicesService;
-    constructor(servicesService) {
-        this.servicesService = servicesService;
+const db_1 = require("../database/db");
+const schema_1 = require("../database/schema");
+const drizzle_orm_1 = require("drizzle-orm");
+class ServicesController {
+    static async verifySalonOwnership(salonId, adminId) {
+        const salonArr = await db_1.db.select().from(schema_1.salons).where((0, drizzle_orm_1.eq)(schema_1.salons.id, salonId));
+        if (salonArr.length === 0)
+            throw new Error('NOT_FOUND');
+        if (salonArr[0].adminId !== adminId)
+            throw new Error('FORBIDDEN');
+        return salonArr[0];
     }
-    async findAll(salonId) {
-        return this.servicesService.findAll(salonId);
+    static async findAll(req, res) {
+        const salonId = req.params.salonId;
+        try {
+            const result = await db_1.db.select().from(schema_1.services).where((0, drizzle_orm_1.eq)(schema_1.services.salonId, salonId));
+            return res.json(result);
+        }
+        catch (err) {
+            console.error(err);
+            return res.status(500).json({ message: 'Internal server error' });
+        }
     }
-    async findOne(salonId, id) {
-        return this.servicesService.findOne(salonId, id);
+    static async findOne(req, res) {
+        const salonId = req.params.salonId;
+        const id = req.params.id;
+        try {
+            const result = await db_1.db
+                .select()
+                .from(schema_1.services)
+                .where((0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema_1.services.id, id), (0, drizzle_orm_1.eq)(schema_1.services.salonId, salonId)));
+            if (result.length === 0)
+                return res.status(404).json({ message: 'Service not found' });
+            return res.json(result[0]);
+        }
+        catch (err) {
+            console.error(err);
+            return res.status(500).json({ message: 'Internal server error' });
+        }
     }
-    async create(salonId, userId, dto) {
-        return this.servicesService.create(salonId, userId, dto);
+    static async create(req, res) {
+        if (!req.user)
+            return res.status(401).json({ message: 'Unauthorized' });
+        const salonId = req.params.salonId;
+        const { name, duration, price } = req.body;
+        try {
+            await ServicesController.verifySalonOwnership(salonId, req.user.sub);
+            await db_1.db.insert(schema_1.services).values({
+                salonId,
+                name: name.trim(),
+                duration: parseInt(duration),
+                price: parseFloat(price),
+            });
+            const allServices = await db_1.db.select().from(schema_1.services).where((0, drizzle_orm_1.eq)(schema_1.services.salonId, salonId));
+            return res.status(201).json(allServices);
+        }
+        catch (err) {
+            if (err.message === 'NOT_FOUND')
+                return res.status(404).json({ message: 'Salon not found' });
+            if (err.message === 'FORBIDDEN')
+                return res.status(403).json({ message: 'Forbidden' });
+            console.error(err);
+            return res.status(500).json({ message: 'Internal server error' });
+        }
     }
-    async update(salonId, id, userId, dto) {
-        return this.servicesService.update(salonId, id, userId, dto);
+    static async update(req, res) {
+        if (!req.user)
+            return res.status(401).json({ message: 'Unauthorized' });
+        const salonId = req.params.salonId;
+        const id = req.params.id;
+        const { name, duration, price } = req.body;
+        try {
+            await ServicesController.verifySalonOwnership(salonId, req.user.sub);
+            const serviceArr = await db_1.db
+                .select()
+                .from(schema_1.services)
+                .where((0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema_1.services.id, id), (0, drizzle_orm_1.eq)(schema_1.services.salonId, salonId)));
+            if (serviceArr.length === 0)
+                return res.status(404).json({ message: 'Service not found' });
+            const updates = {};
+            if (name?.trim())
+                updates.name = name.trim();
+            if (duration !== undefined)
+                updates.duration = parseInt(duration);
+            if (price !== undefined)
+                updates.price = parseFloat(price);
+            if (Object.keys(updates).length > 0) {
+                await db_1.db.update(schema_1.services).set(updates).where((0, drizzle_orm_1.eq)(schema_1.services.id, id));
+            }
+            const updated = await db_1.db.select().from(schema_1.services).where((0, drizzle_orm_1.eq)(schema_1.services.id, id));
+            return res.json(updated[0]);
+        }
+        catch (err) {
+            if (err.message === 'NOT_FOUND')
+                return res.status(404).json({ message: 'Salon not found' });
+            if (err.message === 'FORBIDDEN')
+                return res.status(403).json({ message: 'Forbidden' });
+            console.error(err);
+            return res.status(500).json({ message: 'Internal server error' });
+        }
     }
-    async remove(salonId, id, userId) {
-        return this.servicesService.remove(salonId, id, userId);
+    static async remove(req, res) {
+        if (!req.user)
+            return res.status(401).json({ message: 'Unauthorized' });
+        const salonId = req.params.salonId;
+        const id = req.params.id;
+        try {
+            await ServicesController.verifySalonOwnership(salonId, req.user.sub);
+            const serviceArr = await db_1.db
+                .select()
+                .from(schema_1.services)
+                .where((0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema_1.services.id, id), (0, drizzle_orm_1.eq)(schema_1.services.salonId, salonId)));
+            if (serviceArr.length === 0)
+                return res.status(404).json({ message: 'Service not found' });
+            await db_1.db.delete(schema_1.services).where((0, drizzle_orm_1.eq)(schema_1.services.id, id));
+            return res.json({ message: 'Service deleted' });
+        }
+        catch (err) {
+            if (err.message === 'NOT_FOUND')
+                return res.status(404).json({ message: 'Salon not found' });
+            if (err.message === 'FORBIDDEN')
+                return res.status(403).json({ message: 'Forbidden' });
+            console.error(err);
+            return res.status(500).json({ message: 'Internal server error' });
+        }
     }
-};
+}
 exports.ServicesController = ServicesController;
-__decorate([
-    (0, common_1.Get)(),
-    __param(0, (0, common_1.Param)('salonId')),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String]),
-    __metadata("design:returntype", Promise)
-], ServicesController.prototype, "findAll", null);
-__decorate([
-    (0, common_1.Get)(':id'),
-    __param(0, (0, common_1.Param)('salonId')),
-    __param(1, (0, common_1.Param)('id')),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, String]),
-    __metadata("design:returntype", Promise)
-], ServicesController.prototype, "findOne", null);
-__decorate([
-    (0, common_1.Post)(),
-    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, guards_1.RolesGuard),
-    (0, decorators_1.Roles)('SALON_ADMIN'),
-    __param(0, (0, common_1.Param)('salonId')),
-    __param(1, (0, decorators_1.CurrentUser)('id')),
-    __param(2, (0, common_1.Body)()),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, String, dto_1.CreateServiceDto]),
-    __metadata("design:returntype", Promise)
-], ServicesController.prototype, "create", null);
-__decorate([
-    (0, common_1.Put)(':id'),
-    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, guards_1.RolesGuard),
-    (0, decorators_1.Roles)('SALON_ADMIN'),
-    __param(0, (0, common_1.Param)('salonId')),
-    __param(1, (0, common_1.Param)('id')),
-    __param(2, (0, decorators_1.CurrentUser)('id')),
-    __param(3, (0, common_1.Body)()),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, String, String, dto_1.UpdateServiceDto]),
-    __metadata("design:returntype", Promise)
-], ServicesController.prototype, "update", null);
-__decorate([
-    (0, common_1.Delete)(':id'),
-    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, guards_1.RolesGuard),
-    (0, decorators_1.Roles)('SALON_ADMIN'),
-    __param(0, (0, common_1.Param)('salonId')),
-    __param(1, (0, common_1.Param)('id')),
-    __param(2, (0, decorators_1.CurrentUser)('id')),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, String, String]),
-    __metadata("design:returntype", Promise)
-], ServicesController.prototype, "remove", null);
-exports.ServicesController = ServicesController = __decorate([
-    (0, common_1.Controller)('salons/:salonId/services'),
-    __metadata("design:paramtypes", [services_service_1.ServicesService])
-], ServicesController);
 //# sourceMappingURL=services.controller.js.map

@@ -1,29 +1,8 @@
-import { UsersService } from './users.service';
+import { Response } from 'express';
+import { AuthRequest } from '../middleware/auth.middleware';
 export declare class UsersController {
-    private readonly usersService;
-    constructor(usersService: UsersService);
-    findAll(): Promise<{
-        id: string;
-        name: string | null;
-        email: string;
-        role: string;
-        createdAt: Date;
-    }[]>;
-    findOne(id: string): Promise<{
-        id: string;
-        name: string | null;
-        email: string;
-        role: string;
-        createdAt: Date;
-    }>;
-    updateRole(id: string, currentUserId: string, role: string): Promise<{
-        id: string;
-        name: string | null;
-        email: string;
-        role: string;
-        createdAt: Date;
-    }>;
-    remove(id: string, currentUserId: string): Promise<{
-        message: string;
-    }>;
+    static findAll(req: any, res: Response): Promise<Response<any, Record<string, any>>>;
+    static findOne(req: any, res: Response): Promise<Response<any, Record<string, any>>>;
+    static updateRole(req: AuthRequest, res: Response): Promise<Response<any, Record<string, any>>>;
+    static remove(req: AuthRequest, res: Response): Promise<Response<any, Record<string, any>>>;
 }

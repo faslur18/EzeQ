@@ -1,76 +1,102 @@
 "use strict";
-var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
-    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
-    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
-    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
-    return c > 3 && r && Object.defineProperty(target, key, r), r;
-};
-var __metadata = (this && this.__metadata) || function (k, v) {
-    if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
-};
-var __param = (this && this.__param) || function (paramIndex, decorator) {
-    return function (target, key) { decorator(target, key, paramIndex); }
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.UsersController = void 0;
-const common_1 = require("@nestjs/common");
-const users_service_1 = require("./users.service");
-const jwt_auth_guard_1 = require("../auth/jwt-auth.guard");
-const guards_1 = require("../common/guards");
-const decorators_1 = require("../common/decorators");
-let UsersController = class UsersController {
-    usersService;
-    constructor(usersService) {
-        this.usersService = usersService;
+const db_1 = require("../database/db");
+const schema_1 = require("../database/schema");
+const drizzle_orm_1 = require("drizzle-orm");
+class UsersController {
+    static async findAll(req, res) {
+        try {
+            const result = await db_1.db
+                .select({
+                id: schema_1.users.id,
+                name: schema_1.users.name,
+                email: schema_1.users.email,
+                role: schema_1.users.role,
+                createdAt: schema_1.users.createdAt,
+            })
+                .from(schema_1.users);
+            return res.json(result);
+        }
+        catch (err) {
+            console.error(err);
+            return res.status(500).json({ message: 'Internal server error' });
+        }
     }
-    async findAll() {
-        return this.usersService.findAll();
+    static async findOne(req, res) {
+        const id = req.params.id;
+        try {
+            const result = await db_1.db
+                .select({
+                id: schema_1.users.id,
+                name: schema_1.users.name,
+                email: schema_1.users.email,
+                role: schema_1.users.role,
+                createdAt: schema_1.users.createdAt,
+            })
+                .from(schema_1.users)
+                .where((0, drizzle_orm_1.eq)(schema_1.users.id, id));
+            if (result.length === 0)
+                return res.status(404).json({ message: 'User not found' });
+            return res.json(result[0]);
+        }
+        catch (err) {
+            console.error(err);
+            return res.status(500).json({ message: 'Internal server error' });
+        }
     }
-    async findOne(id) {
-        return this.usersService.findOne(id);
+    static async updateRole(req, res) {
+        if (!req.user)
+            return res.status(401).json({ message: 'Unauthorized' });
+        const id = req.params.id;
+        const { role } = req.body;
+        const currentUserId = req.user.sub;
+        if (id === currentUserId)
+            return res.status(400).json({ message: 'Cannot modify your own role' });
+        try {
+            const userArr = await db_1.db.select().from(schema_1.users).where((0, drizzle_orm_1.eq)(schema_1.users.id, id));
+            if (userArr.length === 0)
+                return res.status(404).json({ message: 'User not found' });
+            if (!['CUSTOMER', 'SALON_ADMIN', 'SUPER_ADMIN'].includes(role)) {
+                return res.status(400).json({ message: 'Invalid role' });
+            }
+            await db_1.db.update(schema_1.users).set({ role }).where((0, drizzle_orm_1.eq)(schema_1.users.id, id));
+            const updated = await db_1.db
+                .select({
+                id: schema_1.users.id,
+                name: schema_1.users.name,
+                email: schema_1.users.email,
+                role: schema_1.users.role,
+                createdAt: schema_1.users.createdAt,
+            })
+                .from(schema_1.users)
+                .where((0, drizzle_orm_1.eq)(schema_1.users.id, id));
+            return res.json(updated[0]);
+        }
+        catch (err) {
+            console.error(err);
+            return res.status(500).json({ message: 'Internal server error' });
+        }
     }
-    async updateRole(id, currentUserId, role) {
-        return this.usersService.updateRole(id, currentUserId, role);
+    static async remove(req, res) {
+        if (!req.user)
+            return res.status(401).json({ message: 'Unauthorized' });
+        const id = req.params.id;
+        const currentUserId = req.user.sub;
+        if (id === currentUserId)
+            return res.status(400).json({ message: 'Cannot delete your own account' });
+        try {
+            const userArr = await db_1.db.select().from(schema_1.users).where((0, drizzle_orm_1.eq)(schema_1.users.id, id));
+            if (userArr.length === 0)
+                return res.status(404).json({ message: 'User not found' });
+            await db_1.db.delete(schema_1.users).where((0, drizzle_orm_1.eq)(schema_1.users.id, id));
+            return res.json({ message: 'User deleted' });
+        }
+        catch (err) {
+            console.error(err);
+            return res.status(500).json({ message: 'Internal server error' });
+        }
     }
-    async remove(id, currentUserId) {
-        return this.usersService.remove(id, currentUserId);
-    }
-};
+}
 exports.UsersController = UsersController;
-__decorate([
-    (0, common_1.Get)(),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", []),
-    __metadata("design:returntype", Promise)
-], UsersController.prototype, "findAll", null);
-__decorate([
-    (0, common_1.Get)(':id'),
-    __param(0, (0, common_1.Param)('id')),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String]),
-    __metadata("design:returntype", Promise)
-], UsersController.prototype, "findOne", null);
-__decorate([
-    (0, common_1.Patch)(':id'),
-    __param(0, (0, common_1.Param)('id')),
-    __param(1, (0, decorators_1.CurrentUser)('id')),
-    __param(2, (0, common_1.Body)('role')),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, String, String]),
-    __metadata("design:returntype", Promise)
-], UsersController.prototype, "updateRole", null);
-__decorate([
-    (0, common_1.Delete)(':id'),
-    __param(0, (0, common_1.Param)('id')),
-    __param(1, (0, decorators_1.CurrentUser)('id')),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, String]),
-    __metadata("design:returntype", Promise)
-], UsersController.prototype, "remove", null);
-exports.UsersController = UsersController = __decorate([
-    (0, common_1.Controller)('users'),
-    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, guards_1.RolesGuard),
-    (0, decorators_1.Roles)('SUPER_ADMIN'),
-    __metadata("design:paramtypes", [users_service_1.UsersService])
-], UsersController);
 //# sourceMappingURL=users.controller.js.map

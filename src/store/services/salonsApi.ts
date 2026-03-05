@@ -25,7 +25,7 @@ export const salonsApi = api.injectEndpoints({
             providesTags: (_result, _err, id) => [{ type: 'Salon', id }],
         }),
         getMySalon: builder.query<Salon, void>({
-            query: () => '/salons/mine',
+            query: () => '/salons/my/salon',
             providesTags: ['Salon'],
         }),
         createSalon: builder.mutation<Salon, CreateSalonRequest>({
@@ -33,7 +33,7 @@ export const salonsApi = api.injectEndpoints({
             invalidatesTags: ['Salon'],
         }),
         updateSalon: builder.mutation<Salon, { id: string; body: UpdateSalonRequest }>({
-            query: ({ id, body }) => ({ url: `/salons/${id}`, method: 'PUT', body }),
+            query: ({ id, body }) => ({ url: `/salons/${id}`, method: 'PATCH', body }),
             invalidatesTags: ['Salon'],
         }),
         deleteSalon: builder.mutation<void, string>({

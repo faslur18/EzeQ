@@ -6,10 +6,10 @@ const router = Router();
 
 // Public routes
 router.get('/', SalonsController.findAll);
+router.get('/my/salon', authenticate, SalonsController.findMySalon);
 router.get('/:id', SalonsController.findOne);
 
 // Protected routes (SALON_ADMIN)
-router.get('/my/salon', authenticate, SalonsController.findMySalon);
 router.post('/', authenticate, authorize(['SALON_ADMIN']), SalonsController.create);
 router.patch('/:id', authenticate, SalonsController.update);
 router.delete('/:id', authenticate, SalonsController.remove);

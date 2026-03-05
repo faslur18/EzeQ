@@ -1,21 +1,12 @@
 "use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
-const core_1 = require("@nestjs/core");
-const common_1 = require("@nestjs/common");
-const app_module_1 = require("./app.module");
-async function bootstrap() {
-    const app = await core_1.NestFactory.create(app_module_1.AppModule);
-    app.enableCors({
-        origin: 'http://localhost:3000',
-        credentials: true,
-    });
-    app.useGlobalPipes(new common_1.ValidationPipe({
-        whitelist: true,
-        forbidNonWhitelisted: true,
-        transform: true,
-    }));
-    await app.listen(4000);
-    console.log('🚀 EzeQ NestJS backend running on http://localhost:4000');
-}
-bootstrap();
+const app_1 = __importDefault(require("./app"));
+const env_1 = require("./config/env");
+const PORT = env_1.env.port;
+app_1.default.listen(PORT, () => {
+    console.log(`EzeQ backend running on http://localhost:${PORT}`);
+});
 //# sourceMappingURL=main.js.map

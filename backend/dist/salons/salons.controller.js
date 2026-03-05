@@ -1,105 +1,138 @@
 "use strict";
-var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
-    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
-    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
-    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
-    return c > 3 && r && Object.defineProperty(target, key, r), r;
-};
-var __metadata = (this && this.__metadata) || function (k, v) {
-    if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
-};
-var __param = (this && this.__param) || function (paramIndex, decorator) {
-    return function (target, key) { decorator(target, key, paramIndex); }
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.SalonsController = void 0;
-const common_1 = require("@nestjs/common");
-const salons_service_1 = require("./salons.service");
-const dto_1 = require("./dto");
-const jwt_auth_guard_1 = require("../auth/jwt-auth.guard");
-const guards_1 = require("../common/guards");
-const decorators_1 = require("../common/decorators");
-let SalonsController = class SalonsController {
-    salonsService;
-    constructor(salonsService) {
-        this.salonsService = salonsService;
+const db_1 = require("../database/db");
+const schema_1 = require("../database/schema");
+const drizzle_orm_1 = require("drizzle-orm");
+class SalonsController {
+    static async findAll(req, res) {
+        try {
+            const result = await db_1.db
+                .select()
+                .from(schema_1.salons)
+                .where((0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema_1.salons.status, 'APPROVED'), (0, drizzle_orm_1.eq)(schema_1.salons.isActive, true)))
+                .orderBy((0, drizzle_orm_1.desc)(schema_1.salons.rating));
+            return res.json(result);
+        }
+        catch (err) {
+            console.error(err);
+            return res.status(500).json({ message: 'Internal server error' });
+        }
     }
-    async findAll() {
-        return this.salonsService.findAll();
+    static async findOne(req, res) {
+        const id = req.params.id;
+        try {
+            const salonArr = await db_1.db.select().from(schema_1.salons).where((0, drizzle_orm_1.eq)(schema_1.salons.id, id));
+            if (salonArr.length === 0)
+                return res.status(404).json({ message: 'Salon not found' });
+            const salonServices = await db_1.db.select().from(schema_1.services).where((0, drizzle_orm_1.eq)(schema_1.services.salonId, id));
+            const salonHours = await db_1.db.select().from(schema_1.operatingHours).where((0, drizzle_orm_1.eq)(schema_1.operatingHours.salonId, id));
+            return res.json({
+                ...salonArr[0],
+                services: salonServices,
+                operatingHours: salonHours,
+            });
+        }
+        catch (err) {
+            console.error(err);
+            return res.status(500).json({ message: 'Internal server error' });
+        }
     }
-    async findMine(userId) {
-        return this.salonsService.findMySalon(userId);
+    static async findMySalon(req, res) {
+        if (!req.user)
+            return res.status(401).json({ message: 'Unauthorized' });
+        try {
+            const salonArr = await db_1.db.select().from(schema_1.salons).where((0, drizzle_orm_1.eq)(schema_1.salons.adminId, req.user.sub));
+            if (salonArr.length === 0)
+                return res.status(404).json({ message: 'Salon not found' });
+            const salonServices = await db_1.db.select().from(schema_1.services).where((0, drizzle_orm_1.eq)(schema_1.services.salonId, salonArr[0].id));
+            const salonHours = await db_1.db.select().from(schema_1.operatingHours).where((0, drizzle_orm_1.eq)(schema_1.operatingHours.salonId, salonArr[0].id));
+            return res.json({
+                ...salonArr[0],
+                services: salonServices,
+                operatingHours: salonHours,
+            });
+        }
+        catch (err) {
+            console.error(err);
+            return res.status(500).json({ message: 'Internal server error' });
+        }
     }
-    async findOne(id) {
-        return this.salonsService.findOne(id);
+    static async create(req, res) {
+        if (!req.user)
+            return res.status(401).json({ message: 'Unauthorized' });
+        const { name, address } = req.body;
+        try {
+            const user = req.user;
+            const existing = await db_1.db.select().from(schema_1.salons).where((0, drizzle_orm_1.eq)(schema_1.salons.adminId, user.sub));
+            if (existing.length > 0) {
+                return res.status(409).json({ message: 'You already have a salon registered' });
+            }
+            await db_1.db.insert(schema_1.salons).values({
+                adminId: user.sub,
+                name: name.trim(),
+                address: address.trim(),
+                rating: 0,
+                isActive: true,
+                status: 'PENDING',
+            });
+            const created = await db_1.db.select().from(schema_1.salons).where((0, drizzle_orm_1.eq)(schema_1.salons.adminId, user.sub));
+            return res.status(201).json(created[0]);
+        }
+        catch (err) {
+            console.error(err);
+            return res.status(500).json({ message: 'Internal server error' });
+        }
     }
-    async create(userId, dto) {
-        return this.salonsService.create(userId, dto);
+    static async update(req, res) {
+        if (!req.user)
+            return res.status(401).json({ message: 'Unauthorized' });
+        const id = req.params.id;
+        const { name, address } = req.body;
+        const user = req.user;
+        try {
+            const salonArr = await db_1.db.select().from(schema_1.salons).where((0, drizzle_orm_1.eq)(schema_1.salons.id, id));
+            if (salonArr.length === 0)
+                return res.status(404).json({ message: 'Salon not found' });
+            if (user.role !== 'SUPER_ADMIN' && salonArr[0].adminId !== user.sub) {
+                return res.status(403).json({ message: 'Forbidden' });
+            }
+            const updates = {};
+            if (name?.trim())
+                updates.name = name.trim();
+            if (address?.trim())
+                updates.address = address.trim();
+            if (Object.keys(updates).length > 0) {
+                await db_1.db.update(schema_1.salons).set(updates).where((0, drizzle_orm_1.eq)(schema_1.salons.id, id));
+            }
+            const updated = await db_1.db.select().from(schema_1.salons).where((0, drizzle_orm_1.eq)(schema_1.salons.id, id));
+            return res.json(updated[0]);
+        }
+        catch (err) {
+            console.error(err);
+            return res.status(500).json({ message: 'Internal server error' });
+        }
     }
-    async update(id, userId, dto) {
-        return this.salonsService.update(id, userId, dto);
+    static async remove(req, res) {
+        if (!req.user)
+            return res.status(401).json({ message: 'Unauthorized' });
+        const id = req.params.id;
+        const user = req.user;
+        try {
+            const salonArr = await db_1.db.select().from(schema_1.salons).where((0, drizzle_orm_1.eq)(schema_1.salons.id, id));
+            if (salonArr.length === 0)
+                return res.status(404).json({ message: 'Salon not found' });
+            if (user.role !== 'SUPER_ADMIN' && salonArr[0].adminId !== user.sub) {
+                return res.status(403).json({ message: 'Forbidden' });
+            }
+            await db_1.db.update(schema_1.salons).set({ isActive: false }).where((0, drizzle_orm_1.eq)(schema_1.salons.id, id));
+            return res.json({ message: 'Salon deactivated' });
+        }
+        catch (err) {
+            console.error(err);
+            return res.status(500).json({ message: 'Internal server error' });
+        }
     }
-    async remove(id, userId, userRole) {
-        return this.salonsService.remove(id, userId, userRole);
-    }
-};
+}
 exports.SalonsController = SalonsController;
-__decorate([
-    (0, common_1.Get)(),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", []),
-    __metadata("design:returntype", Promise)
-], SalonsController.prototype, "findAll", null);
-__decorate([
-    (0, common_1.Get)('mine'),
-    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, guards_1.RolesGuard),
-    (0, decorators_1.Roles)('SALON_ADMIN'),
-    __param(0, (0, decorators_1.CurrentUser)('id')),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String]),
-    __metadata("design:returntype", Promise)
-], SalonsController.prototype, "findMine", null);
-__decorate([
-    (0, common_1.Get)(':id'),
-    __param(0, (0, common_1.Param)('id')),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String]),
-    __metadata("design:returntype", Promise)
-], SalonsController.prototype, "findOne", null);
-__decorate([
-    (0, common_1.Post)(),
-    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, guards_1.RolesGuard),
-    (0, decorators_1.Roles)('SALON_ADMIN'),
-    __param(0, (0, decorators_1.CurrentUser)('id')),
-    __param(1, (0, common_1.Body)()),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, dto_1.CreateSalonDto]),
-    __metadata("design:returntype", Promise)
-], SalonsController.prototype, "create", null);
-__decorate([
-    (0, common_1.Put)(':id'),
-    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, guards_1.RolesGuard),
-    (0, decorators_1.Roles)('SALON_ADMIN'),
-    __param(0, (0, common_1.Param)('id')),
-    __param(1, (0, decorators_1.CurrentUser)('id')),
-    __param(2, (0, common_1.Body)()),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, String, dto_1.UpdateSalonDto]),
-    __metadata("design:returntype", Promise)
-], SalonsController.prototype, "update", null);
-__decorate([
-    (0, common_1.Delete)(':id'),
-    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, guards_1.RolesGuard),
-    (0, decorators_1.Roles)('SALON_ADMIN', 'SUPER_ADMIN'),
-    __param(0, (0, common_1.Param)('id')),
-    __param(1, (0, decorators_1.CurrentUser)('id')),
-    __param(2, (0, decorators_1.CurrentUser)('role')),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, String, String]),
-    __metadata("design:returntype", Promise)
-], SalonsController.prototype, "remove", null);
-exports.SalonsController = SalonsController = __decorate([
-    (0, common_1.Controller)('salons'),
-    __metadata("design:paramtypes", [salons_service_1.SalonsService])
-], SalonsController);
 //# sourceMappingURL=salons.controller.js.map
