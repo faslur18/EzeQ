@@ -1,20 +1,24 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useSession } from "next-auth/react"
+import { useSelector } from "react-redux"
 import { useRouter, useParams } from "next/navigation"
 import { Calendar } from "@/components/ui/calendar"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { getAvailableTimeSlots, createBooking } from "@/app/actions/booking"
+import { RootState } from "@/store/store"
+import { useGetHoursQuery } from "@/store/services/hoursApi"
+import { useGetServiceByIdQuery } from "@/store/services/servicesApi"
+import { useGetAppointmentsQuery, useCreateAppointmentMutation } from "@/store/services/appointmentsApi"
+import AuthGuard from "@/components/auth/AuthGuard"
 
-export default function BookingPage() {
+function BookingContent() {
     const router = useRouter()
     const params = useParams()
     const salonId = params.salonId as string
     const serviceId = params.serviceId as string
 
-    const { data: session, status } = useSession()
+    const user = useSelector((state: RootState) => state.auth.user)
 
     const [date, setDate] = useState<Date | undefined>(new Date())
     const [slots, setSlots] = useState<string[]>([])
@@ -22,40 +26,87 @@ export default function BookingPage() {
     const [loading, setLoading] = useState(false)
     const [bookingLoading, setBookingLoading] = useState(false)
 
-    // Wait for session
-    if (status === "unauthenticated") {
-        // If we wanted to ensure login immediately, we could router.push("/login")
-        // or handle in middleware. MVP relies on middleware protecting routes.
-    }
+    // Fetch service details for duration
+    const { data: service } = useGetServiceByIdQuery({ salonId, id: serviceId })
+    // Fetch operating hours
+    const { data: hours = [] } = useGetHoursQuery(salonId)
+    // Fetch existing appointments for conflict checking
+    const { data: appointments = [] } = useGetAppointmentsQuery()
+    // Mutation for creating booking
+    const [createAppointment] = useCreateAppointmentMutation()
 
-    // Fetch slots whenever the date changes
+    // Generate time slots client-side
     useEffect(() => {
-        async function fetchSlots() {
-            if (!date || !salonId || !serviceId) return
-            setLoading(true)
-            setSelectedSlot(null) // Reset selection
-            try {
-                const dateStr = date.toISOString().split("T")[0] // Simple YYYY-MM-DD formatting relative to UTC edge cases, better to use date-fns format if needed. 
-                // For MVP, using standard toISOString split or localized formatting.
-                const offset = date.getTimezoneOffset()
-                const localDate = new Date(date.getTime() - (offset * 60 * 1000))
-                const localDateStr = localDate.toISOString().split("T")[0]
+        if (!date || !service || !hours.length) {
+            setSlots([])
+            return
+        }
 
-                const availableSlots = await getAvailableTimeSlots(salonId, serviceId, localDateStr)
-                setSlots(availableSlots)
-            } catch (error) {
-                console.error("Failed to fetch slots", error)
-                setSlots([])
-            } finally {
-                setLoading(false)
+        setLoading(true)
+        setSelectedSlot(null)
+
+        const dayOfWeek = date.getDay()
+        const dayHours = hours.find((h) => h.dayOfWeek === dayOfWeek)
+
+        if (!dayHours) {
+            setSlots([])
+            setLoading(false)
+            return
+        }
+
+        const offset = date.getTimezoneOffset()
+        const localDate = new Date(date.getTime() - (offset * 60 * 1000))
+        const dateStr = localDate.toISOString().split("T")[0]
+
+        // Parse open/close times
+        const [openH, openM] = dayHours.openTime.split(":").map(Number)
+        const [closeH, closeM] = dayHours.closeTime.split(":").map(Number)
+
+        const openMinutes = openH * 60 + openM
+        const closeMinutes = closeH * 60 + closeM
+        const duration = service.duration
+
+        const now = new Date()
+        const todayStr = new Date(now.getTime() - (now.getTimezoneOffset() * 60 * 1000)).toISOString().split("T")[0]
+        const isToday = dateStr === todayStr
+        const currentMinutes = now.getHours() * 60 + now.getMinutes()
+
+        // Filter existing appointments for this date and salon
+        const dayAppts = (appointments as any[]).filter(
+            (a) => a.appointmentDate === dateStr && a.salonId === salonId && a.status !== "CANCELLED"
+        )
+
+        const availableSlots: string[] = []
+        for (let m = openMinutes; m + duration <= closeMinutes; m += 30) {
+            if (isToday && m < currentMinutes) continue
+
+            const slotStart = m
+            const slotEnd = m + duration
+
+            // Check overlaps with existing appointments
+            const isOverlapping = dayAppts.some((appt: any) => {
+                const [aH, aM] = (appt.startTime || "00:00").split(":").map(Number)
+                const apptStart = aH * 60 + aM
+                const apptDuration = appt.service?.duration || 30
+                const apptEnd = apptStart + apptDuration
+                return slotStart < apptEnd && apptStart < slotEnd
+            })
+
+            if (!isOverlapping) {
+                const hours = Math.floor(m / 60)
+                const mins = m % 60
+                availableSlots.push(
+                    `${hours.toString().padStart(2, "0")}:${mins.toString().padStart(2, "0")}`
+                )
             }
         }
 
-        fetchSlots()
-    }, [date, salonId, serviceId])
+        setSlots(availableSlots)
+        setLoading(false)
+    }, [date, service, hours, appointments, salonId])
 
     const handleBooking = async () => {
-        if (!session?.user?.id || !selectedSlot || !date) return
+        if (!user || !selectedSlot || !date) return
         setBookingLoading(true)
 
         try {
@@ -63,9 +114,14 @@ export default function BookingPage() {
             const localDate = new Date(date.getTime() - (offset * 60 * 1000))
             const localDateStr = localDate.toISOString().split("T")[0]
 
-            await createBooking(session.user.id, salonId, serviceId, localDateStr, selectedSlot)
-            // Redirect to customer dashboard on success
-            router.push("/customer/dashboard")
+            await createAppointment({
+                salonId,
+                serviceId,
+                appointmentDate: localDateStr,
+                startTime: selectedSlot,
+            }).unwrap()
+
+            router.push("/dashboard")
         } catch (error) {
             console.error("Booking error:", error)
             alert("Failed to confirm booking. The slot might have been taken.")
@@ -142,5 +198,13 @@ export default function BookingPage() {
                 </CardContent>
             </Card>
         </div>
+    )
+}
+
+export default function BookingPage() {
+    return (
+        <AuthGuard allowedRoles={["CUSTOMER"]}>
+            <BookingContent />
+        </AuthGuard>
     )
 }

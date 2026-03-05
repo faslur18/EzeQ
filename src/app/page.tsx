@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { ArrowRight, Calendar, Scissors, TrendingUp, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 
 export default function Home() {
   return (

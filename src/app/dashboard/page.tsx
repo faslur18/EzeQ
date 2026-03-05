@@ -1,34 +1,25 @@
 "use client"
 
-import { useSession, signOut } from "next-auth/react"
+import { useSelector, useDispatch } from "react-redux"
 import { useRouter } from "next/navigation"
-import { useEffect, useState } from "react"
 import Link from "next/link"
 import Icon from "@/components/ui/icon"
 import Modal from "@/components/ui/modal"
+import { useState } from "react"
+import { RootState } from "@/store/store"
+import { logout } from "@/store/authSlice"
+import AuthGuard from "@/components/auth/AuthGuard"
 
-export default function CustomerDashboard() {
-    const { data: session, status } = useSession()
+function CustomerDashboardContent() {
+    const dispatch = useDispatch()
     const router = useRouter()
+    const user = useSelector((state: RootState) => state.auth.user)
     const [isSignOutModalOpen, setIsSignOutModalOpen] = useState(false)
 
-    useEffect(() => {
-        if (status === "unauthenticated") {
-            router.push("/auth/login")
-        }
-    }, [status, router])
-
-    if (status === "loading") {
-        return (
-            <div className="flex min-h-screen items-center justify-center bg-white bg-nothing-grid">
-                <div className="animate-pulse text-lg font-bold text-slate-900">Loading EzeQ...</div>
-            </div>
-        )
+    const handleSignOut = () => {
+        dispatch(logout())
+        router.push("/auth/login")
     }
-
-    if (!session) return null
-
-    const user = session.user as any
 
     return (
         <div className="min-h-screen bg-white bg-nothing-grid font-sans text-slate-900">
@@ -151,11 +142,19 @@ export default function CustomerDashboard() {
                 title="Sign Out"
                 description="Are you sure you want to sign out of your EzeQ account?"
                 primaryActionText="Yes, Sign Out"
-                primaryActionOnClick={() => signOut({ callbackUrl: "/auth/login" })}
+                primaryActionOnClick={handleSignOut}
                 primaryActionClassName="bg-destructive hover:bg-destructive/90 text-white border-destructive rounded-sm"
                 secondaryActionText="Cancel"
                 secondaryActionOnClick={() => setIsSignOutModalOpen(false)}
             />
         </div>
+    )
+}
+
+export default function CustomerDashboard() {
+    return (
+        <AuthGuard allowedRoles={["CUSTOMER"]}>
+            <CustomerDashboardContent />
+        </AuthGuard>
     )
 }
