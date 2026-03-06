@@ -66,7 +66,7 @@ export class SalonsController {
     // Create a new salon (SALON_ADMIN)
     static async create(req: AuthRequest, res: Response) {
         if (!req.user) return res.status(401).json({ message: 'Unauthorized' });
-        const { name, address } = req.body;
+        const { name, address, description, contactPhone, contactEmail, profileImage, coverImage } = req.body;
 
         try {
             const user = req.user!;
@@ -79,6 +79,11 @@ export class SalonsController {
                 adminId: user.sub,
                 name: name.trim(),
                 address: address.trim(),
+                description: description?.trim() || null,
+                contactPhone: contactPhone?.trim() || null,
+                contactEmail: contactEmail?.trim() || null,
+                profileImage: profileImage?.trim() || null,
+                coverImage: coverImage?.trim() || null,
                 rating: 0,
                 isActive: true,
                 status: 'PENDING',
@@ -96,7 +101,7 @@ export class SalonsController {
     static async update(req: AuthRequest, res: Response) {
         if (!req.user) return res.status(401).json({ message: 'Unauthorized' });
         const id = req.params.id as string;
-        const { name, address } = req.body;
+        const { name, address, description, contactPhone, contactEmail, profileImage, coverImage } = req.body;
         const user = req.user!;
 
         try {
@@ -109,6 +114,21 @@ export class SalonsController {
             const updates: Record<string, any> = {};
             if (name?.trim()) updates.name = name.trim();
             if (address?.trim()) updates.address = address.trim();
+            if (description !== undefined) {
+                updates.description = description?.trim() ? description.trim() : null;
+            }
+            if (contactPhone !== undefined) {
+                updates.contactPhone = contactPhone?.trim() ? contactPhone.trim() : null;
+            }
+            if (contactEmail !== undefined) {
+                updates.contactEmail = contactEmail?.trim() ? contactEmail.trim() : null;
+            }
+            if (profileImage !== undefined) {
+                updates.profileImage = profileImage?.trim() ? profileImage.trim() : null;
+            }
+            if (coverImage !== undefined) {
+                updates.coverImage = coverImage?.trim() ? coverImage.trim() : null;
+            }
 
             if (Object.keys(updates).length > 0) {
                 await db.update(salons).set(updates).where(eq(salons.id, id));

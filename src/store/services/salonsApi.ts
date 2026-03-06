@@ -5,14 +5,35 @@ export type Salon = {
     adminId: string;
     name: string;
     address: string;
+    description?: string | null;
+    contactPhone?: string | null;
+    contactEmail?: string | null;
+    profileImage?: string | null;
+    coverImage?: string | null;
     rating: number;
     isActive: boolean;
     status: string;
     createdAt?: string;
 };
 
-type CreateSalonRequest = { name: string; address: string };
-type UpdateSalonRequest = { name?: string; address?: string };
+type CreateSalonRequest = {
+    name: string;
+    address: string;
+    description?: string | null;
+    contactPhone?: string | null;
+    contactEmail?: string | null;
+    profileImage?: string | null;
+    coverImage?: string | null;
+};
+type UpdateSalonRequest = {
+    name?: string;
+    address?: string;
+    description?: string | null;
+    contactPhone?: string | null;
+    contactEmail?: string | null;
+    profileImage?: string | null;
+    coverImage?: string | null;
+};
 
 export const salonsApi = api.injectEndpoints({
     endpoints: (builder) => ({
