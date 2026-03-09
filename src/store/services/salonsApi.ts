@@ -37,8 +37,16 @@ type UpdateSalonRequest = {
 
 export const salonsApi = api.injectEndpoints({
     endpoints: (builder) => ({
-        getSalons: builder.query<Salon[], void>({
-            query: () => '/salons',
+        getSalons: builder.query<Salon[], { name?: string; address?: string } | void>({
+            query: (params) => {
+                const searchParams = new URLSearchParams();
+                if (params && typeof params === 'object') {
+                    if (params.name) searchParams.append('name', params.name);
+                    if (params.address) searchParams.append('address', params.address);
+                }
+                const s = searchParams.toString();
+                return `/salons${s ? `?${s}` : ''}`;
+            },
             providesTags: ['Salon'],
         }),
         getSalonById: builder.query<Salon, string>({

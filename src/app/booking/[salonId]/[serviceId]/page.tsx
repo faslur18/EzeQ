@@ -1,24 +1,31 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useSelector } from "react-redux"
+import { useSelector, useDispatch } from "react-redux"
 import { useRouter, useParams } from "next/navigation"
-import { Calendar } from "@/components/ui/calendar"
+import { CustomCalendar } from "@/components/ui/CustomCalendar"
+import BackButton from "@/components/ui/BackButton"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import Icon from "@/components/ui/icon"
+import Modal from "@/components/ui/modal"
+import Header from "@/components/layout/Header"
 import { RootState } from "@/store/store"
+import { logout } from "@/store/authSlice"
 import { useGetHoursQuery } from "@/store/services/hoursApi"
 import { useGetServiceByIdQuery } from "@/store/services/servicesApi"
+import { useGetSalonByIdQuery } from "@/store/services/salonsApi"
 import { useGetAppointmentsQuery, useCreateAppointmentMutation } from "@/store/services/appointmentsApi"
 import AuthGuard from "@/components/auth/AuthGuard"
 
 function BookingContent() {
     const router = useRouter()
+    const dispatch = useDispatch()
     const params = useParams()
     const salonId = params.salonId as string
     const serviceId = params.serviceId as string
 
     const user = useSelector((state: RootState) => state.auth.user)
+    const [isSignOutModalOpen, setIsSignOutModalOpen] = useState(false)
 
     const [date, setDate] = useState<Date | undefined>(new Date())
     const [slots, setSlots] = useState<string[]>([])
@@ -26,14 +33,17 @@ function BookingContent() {
     const [loading, setLoading] = useState(false)
     const [bookingLoading, setBookingLoading] = useState(false)
 
-    // Fetch service details for duration
+    // Fetch dependencies
+    const { data: salon } = useGetSalonByIdQuery(salonId)
     const { data: service } = useGetServiceByIdQuery({ salonId, id: serviceId })
-    // Fetch operating hours
     const { data: hours = [] } = useGetHoursQuery(salonId)
-    // Fetch existing appointments for conflict checking
     const { data: appointments = [] } = useGetAppointmentsQuery()
-    // Mutation for creating booking
     const [createAppointment] = useCreateAppointmentMutation()
+
+    const handleSignOut = () => {
+        dispatch(logout())
+        router.push("/auth/login")
+    }
 
     // Generate time slots client-side
     useEffect(() => {
@@ -58,7 +68,6 @@ function BookingContent() {
         const localDate = new Date(date.getTime() - (offset * 60 * 1000))
         const dateStr = localDate.toISOString().split("T")[0]
 
-        // Parse open/close times
         const [openH, openM] = dayHours.openTime.split(":").map(Number)
         const [closeH, closeM] = dayHours.closeTime.split(":").map(Number)
 
@@ -71,7 +80,6 @@ function BookingContent() {
         const isToday = dateStr === todayStr
         const currentMinutes = now.getHours() * 60 + now.getMinutes()
 
-        // Filter existing appointments for this date and salon
         const dayAppts = (appointments as any[]).filter(
             (a) => a.appointmentDate === dateStr && a.salonId === salonId && a.status !== "CANCELLED"
         )
@@ -83,7 +91,6 @@ function BookingContent() {
             const slotStart = m
             const slotEnd = m + duration
 
-            // Check overlaps with existing appointments
             const isOverlapping = dayAppts.some((appt: any) => {
                 const [aH, aM] = (appt.startTime || "00:00").split(":").map(Number)
                 const apptStart = aH * 60 + aM
@@ -124,79 +131,159 @@ function BookingContent() {
             router.push("/dashboard")
         } catch (error) {
             console.error("Booking error:", error)
-            alert("Failed to confirm booking. The slot might have been taken.")
         } finally {
             setBookingLoading(false)
         }
     }
 
     return (
-        <div className="container mx-auto py-12 px-4 max-w-4xl">
-            <Card className="rounded-xl shadow-lg border-neutral-100">
-                <CardHeader className="bg-neutral-50/50 rounded-t-xl border-b pb-8">
-                    <CardTitle className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600">
-                        Select an Appointment Time
-                    </CardTitle>
-                    <CardDescription className="text-lg">Pick a date and choose an available time slot.</CardDescription>
-                </CardHeader>
+        <div className="min-h-screen bg-white bg-nothing-grid font-sans text-slate-900">
+            <Header user={user} onSignOut={() => setIsSignOutModalOpen(true)} />
 
-                <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-6">
-                    <div className="flex flex-col items-center p-4 border rounded-xl bg-white shadow-sm">
-                        <h3 className="font-semibold text-xl mb-4 text-neutral-800">1. Choose Date</h3>
-                        <Calendar
-                            mode="single"
-                            selected={date}
-                            onSelect={setDate}
-                            className="rounded-md border shadow-sm"
-                            disabled={(d) => d < new Date(new Date().setHours(0, 0, 0, 0))}
-                        />
+            <main className="max-w-6xl mx-auto px-4 lg:px-8 py-10">
+                <div className="mb-10 flex flex-col gap-6">
+                    <BackButton label="Back to Salon" />
+                    <div>
+                        <h2 className="text-3xl font-black tracking-tight text-slate-900 mb-2">
+                            Complete Your Booking
+                        </h2>
+                        <p className="text-lg text-slate-500 font-medium font-sans">
+                            {service ? `Booking ${service.name} at ${salon?.name}` : "Pick a date and choose an available time slot."}
+                        </p>
                     </div>
+                </div>
 
-                    <div className="flex flex-col">
-                        <h3 className="font-semibold text-xl mb-4 text-neutral-800">2. Choose Time Slot</h3>
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    {/* Main Selection Area */}
+                    <div className="lg:col-span-2 space-y-8">
+                        {/* Step 1: Date Selection */}
+                        <div className="border-2 border-black p-6 bg-white shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
+                            <h3 className="text-xl font-black text-slate-900 mb-6 flex items-center gap-2">
+                                <span className="flex h-8 w-8 items-center justify-center bg-black text-white text-sm">1</span>
+                                Select Date
+                            </h3>
+                            <div className="w-full">
+                                <CustomCalendar
+                                    selected={date}
+                                    onSelect={setDate}
+                                    disabled={(d: Date) => d < new Date(new Date().setHours(0, 0, 0, 0))}
+                                />
+                            </div>
+                        </div>
 
-                        {loading ? (
-                            <div className="flex-1 flex items-center justify-center">
-                                <div className="animate-pulse flex flex-col items-center">
-                                    <div className="h-8 w-8 rounded-full border-4 border-t-blue-500 border-r-transparent animate-spin mb-4"></div>
-                                    <p className="text-neutral-500 font-medium">Loading available slots...</p>
+                        {/* Step 2: Time Selection */}
+                        <div className="border-2 border-black p-6 bg-white shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
+                            <h3 className="text-xl font-black text-slate-900 mb-6 flex items-center gap-2">
+                                <span className="flex h-8 w-8 items-center justify-center bg-black text-white text-sm">2</span>
+                                Available Time Slots
+                            </h3>
+
+                            {loading ? (
+                                <div className="py-12 flex flex-col items-center justify-center space-y-4">
+                                    <div className="h-10 w-10 border-4 border-t-black border-r-transparent animate-spin"></div>
+                                    <p className="text-slate-500 font-bold uppercase tracking-widest text-xs">Finding matches...</p>
                                 </div>
-                            </div>
-                        ) : slots.length > 0 ? (
-                            <div className="grid grid-cols-3 gap-3">
-                                {slots.map((slot) => (
-                                    <Button
-                                        key={slot}
-                                        variant={selectedSlot === slot ? "default" : "outline"}
-                                        className={`transition-all ${selectedSlot === slot ? "bg-blue-600 shadow-md transform scale-105" : "hover:border-blue-300 hover:bg-blue-50"}`}
-                                        onClick={() => setSelectedSlot(slot)}
-                                    >
-                                        {slot}
-                                    </Button>
-                                ))}
-                            </div>
-                        ) : (
-                            <div className="flex-1 flex flex-col items-center justify-center p-6 bg-neutral-50 rounded-xl border border-dashed border-neutral-200">
-                                <svg className="w-12 h-12 text-neutral-400 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                </svg>
-                                <p className="text-neutral-500 text-center font-medium">No available slots for this date.<br />Try selecting another day.</p>
-                            </div>
-                        )}
-
-                        <div className="mt-auto pt-8">
-                            <Button
-                                size="lg"
-                                className={`w-full text-lg shadow-md transition-all ${!selectedSlot || loading || bookingLoading ? 'opacity-50 cursor-not-allowed' : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:shadow-lg transform hover:-translate-y-1'}`}
-                                disabled={!selectedSlot || loading || bookingLoading}
-                                onClick={handleBooking}
-                            >
-                                {bookingLoading ? "Confirming..." : "Confirm Booking"}
-                            </Button>
+                            ) : slots.length > 0 ? (
+                                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                                    {slots.map((slot) => (
+                                        <button
+                                            key={slot}
+                                            onClick={() => setSelectedSlot(slot)}
+                                            className={`py-3 px-4 font-bold border-2 transition-all text-sm ${selectedSlot === slot
+                                                ? "bg-black text-white border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] translate-x-[-2px] translate-y-[-2px]"
+                                                : "bg-white text-slate-900 border-input hover:border-black"
+                                                }`}
+                                        >
+                                            {slot}
+                                        </button>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="py-12 border-2 border-dashed border-input bg-slate-50 text-center">
+                                    <Icon name="event_busy" size="xl" className="text-slate-300 mb-2" />
+                                    <p className="font-bold text-slate-400">No available slots for this date.</p>
+                                    <p className="text-xs text-slate-400 font-medium">Try selecting another day.</p>
+                                </div>
+                            )}
                         </div>
                     </div>
-                </CardContent>
-            </Card>
+
+                    {/* Booking Summary Sidebar */}
+                    <div className="space-y-6">
+                        <div className="border-2 border-black p-6 bg-white shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] sticky top-[100px]">
+                            <h3 className="text-xl font-black text-slate-900 mb-6 uppercase tracking-tight">Booking Summary</h3>
+
+                            <div className="space-y-6 mb-8">
+                                <div className="flex gap-4">
+                                    <div className="h-10 w-10 bg-slate-100 flex items-center justify-center shrink-0">
+                                        <Icon name="store" size="sm" className="text-slate-400" />
+                                    </div>
+                                    <div>
+                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Salon</p>
+                                        <p className="font-bold text-slate-900 leading-tight">{salon?.name || "..."}</p>
+                                    </div>
+                                </div>
+
+                                <div className="flex gap-4">
+                                    <div className="h-10 w-10 bg-slate-100 flex items-center justify-center shrink-0">
+                                        <Icon name="content_cut" size="sm" className="text-slate-400" />
+                                    </div>
+                                    <div>
+                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Service</p>
+                                        <p className="font-bold text-slate-900 leading-tight">{service?.name || "..."}</p>
+                                        <p className="text-xs text-slate-500 font-medium">{service?.duration} mins • ${service?.price}</p>
+                                    </div>
+                                </div>
+
+                                <div className="flex gap-4">
+                                    <div className="h-10 w-10 bg-slate-100 flex items-center justify-center shrink-0">
+                                        <Icon name="calendar_today" size="sm" className="text-slate-400" />
+                                    </div>
+                                    <div>
+                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Date & Time</p>
+                                        <p className="font-bold text-slate-900 leading-tight">
+                                            {date?.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                                        </p>
+                                        <p className="text-sm font-black text-black">
+                                            {selectedSlot ? `@ ${selectedSlot}` : "Select a time"}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <button
+                                disabled={!selectedSlot || loading || bookingLoading}
+                                onClick={handleBooking}
+                                className="w-full bg-black text-white py-4 font-black text-lg uppercase tracking-tight hover:bg-black/90 transition-all disabled:bg-slate-200 disabled:cursor-not-allowed flex items-center justify-center gap-2 group"
+                            >
+                                {bookingLoading ? "Confirming..." : "Confirm Booking"}
+                                <Icon name="check_circle" size="md" className="group-hover:scale-110 transition-transform" />
+                            </button>
+
+                            {!selectedSlot && (
+                                <p className="mt-4 text-[10px] text-center font-bold text-slate-400 uppercase tracking-widest leading-relaxed">
+                                    Pick a time slot to continue
+                                </p>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            </main>
+
+            <Modal
+                isOpen={isSignOutModalOpen}
+                onClose={() => setIsSignOutModalOpen(false)}
+                icon="logout"
+                iconBg="bg-red-100"
+                iconColor="text-destructive"
+                title="Sign Out"
+                description="Are you sure you want to sign out?"
+                primaryActionText="Yes, Sign Out"
+                primaryActionOnClick={handleSignOut}
+                primaryActionClassName="bg-destructive hover:bg-destructive/90 text-white border-destructive rounded-sm"
+                secondaryActionText="Cancel"
+                secondaryActionOnClick={() => setIsSignOutModalOpen(false)}
+            />
         </div>
     )
 }

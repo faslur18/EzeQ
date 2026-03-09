@@ -2,18 +2,28 @@
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
+import { useSelector } from "react-redux";
 import AuthGuard from "@/components/auth/AuthGuard";
 import AdminSidebar from "@/components/layout/admin-sidebar";
 import DashboardHeader from "@/components/layout/dashboard-header";
 import Icon from "@/components/ui/icon";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { RootState } from "@/store/store";
 import {
   useGetMySalonQuery,
   useUpdateSalonMutation,
 } from "@/store/services/salonsApi";
 
 function SalonProfileContent() {
-  const { data: adminSalon, isLoading, isError, error } = useGetMySalonQuery();
+  const token = useSelector((state: RootState) => state.auth.token);
+  const {
+    data: adminSalon,
+    isLoading,
+    isFetching,
+    isError,
+    error,
+    refetch,
+  } = useGetMySalonQuery(undefined, { skip: !token });
   const [updateSalon, { isLoading: isSavingSalon }] = useUpdateSalonMutation();
   const [isEditingImages, setIsEditingImages] = useState(false);
   const [isEditingAbout, setIsEditingAbout] = useState(false);
@@ -83,7 +93,7 @@ function SalonProfileContent() {
     }
   };
 
-  if (isLoading) {
+  if (!token || isLoading || isFetching) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-white">
         <div className="animate-pulse text-lg font-bold text-slate-900">
@@ -93,7 +103,46 @@ function SalonProfileContent() {
     );
   }
 
-  if (!adminSalon || (isError && (error as any)?.status === 404)) {
+  const errorStatus = (error as any)?.status;
+  const isNotFound = isError && errorStatus === 404;
+  const isRequestError = isError && !isNotFound;
+
+  if (isRequestError) {
+    return (
+      <div className="flex h-screen w-full overflow-hidden bg-white">
+        <AdminSidebar salonName="My Salon" activePath="/admin/salon-profile" />
+        <main className="flex flex-1 flex-col overflow-y-auto overflow-x-hidden">
+          <div className="flex flex-col gap-6 p-4 md:p-8">
+            <Card className="p-2 md:p-2">
+              <CardContent className="pt-6">
+                <div className="flex items-center gap-4 mb-4">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-sm bg-red-100 text-red-600">
+                    <Icon name="error" size="lg" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-bold text-slate-900">
+                      Failed to load salon profile
+                    </h2>
+                    <p className="text-sm text-slate-500">
+                      Status: {String(errorStatus ?? "unknown")}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => refetch()}
+                  className="inline-flex items-center justify-center rounded-full bg-primary py-2.5 px-6 text-sm font-bold text-primary-foreground transition-all hover:bg-primary/90 active:scale-[0.98]"
+                >
+                  Retry
+                </button>
+              </CardContent>
+            </Card>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  if (!adminSalon || isNotFound) {
     return (
       <div className="flex h-screen w-full overflow-hidden bg-white">
         <AdminSidebar salonName="My Salon" activePath="/admin/salon-profile" />

@@ -1,17 +1,28 @@
 import { Response } from 'express';
 import { db } from '../database/db';
 import { salons, services, operatingHours } from '../database/schema';
-import { eq, and, desc } from 'drizzle-orm';
+import { eq, and, desc, like } from 'drizzle-orm';
 import { AuthRequest } from '../middleware/auth.middleware';
 
 export class SalonsController {
-    // List all approved & active salons (public)
+    // List all approved & active salons (public) with search/filter
     static async findAll(req: any, res: Response) {
+        const { name, address } = req.query;
         try {
+            const filterConditions = [eq(salons.status, 'APPROVED'), eq(salons.isActive, true)];
+
+            if (name) {
+                filterConditions.push(like(salons.name, `%${name}%`));
+            }
+
+            if (address) {
+                filterConditions.push(like(salons.address, `%${address}%`));
+            }
+
             const result = await db
                 .select()
                 .from(salons)
-                .where(and(eq(salons.status, 'APPROVED'), eq(salons.isActive, true)))
+                .where(and(...filterConditions))
                 .orderBy(desc(salons.rating));
             return res.json(result);
         } catch (err) {

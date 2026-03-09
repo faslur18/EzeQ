@@ -108,4 +108,45 @@ export class AuthController {
             return res.status(500).json({ message: 'Internal server error' });
         }
     }
+
+    static async updateProfile(req: AuthRequest, res: Response) {
+        if (!req.user) return res.status(401).json({ message: 'Unauthorized' });
+
+        const { name, email, password } = req.body ?? {};
+
+        try {
+            if (email) {
+                const existing = await db.select().from(users).where(eq(users.email, email));
+                if (existing.length > 0 && existing[0].id !== req.user.sub) {
+                    return res.status(409).json({ message: 'Email is already taken by another account' });
+                }
+            }
+
+            const updateData: any = {};
+            if (name !== undefined) updateData.name = name;
+            if (email !== undefined) updateData.email = email;
+            if (password) {
+                updateData.password = await bcrypt.hash(password, SALT_ROUNDS);
+            }
+
+            if (Object.keys(updateData).length === 0) {
+                return res.status(400).json({ message: 'No changes provided' });
+            }
+
+            await db.update(users).set(updateData).where(eq(users.id, req.user.sub));
+
+            const result = await db.select({
+                id: users.id,
+                name: users.name,
+                email: users.email,
+                role: users.role,
+                createdAt: users.createdAt,
+            }).from(users).where(eq(users.id, req.user.sub));
+
+            return res.json({ message: 'Profile updated successfully', user: result[0] });
+        } catch (err) {
+            console.error(err);
+            return res.status(500).json({ message: 'Internal server error' });
+        }
+    }
 }

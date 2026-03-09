@@ -29,7 +29,7 @@ const navItems: Omit<NavItem, "active">[] = [
 ]
 
 const bottomItems = [
-    { icon: "home", label: "Back to Home", href: "/" },
+    { icon: "person", label: "Personal Profile", href: "/profile" }
 ]
 
 export default function AdminSidebar({ salonName, activePath }: AdminSidebarProps) {

@@ -2,19 +2,42 @@
 
 import { useSelector, useDispatch } from "react-redux"
 import { useRouter } from "next/navigation"
-import Link from "next/link"
 import Icon from "@/components/ui/icon"
 import Modal from "@/components/ui/modal"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { RootState } from "@/store/store"
 import { logout } from "@/store/authSlice"
 import AuthGuard from "@/components/auth/AuthGuard"
+import SalonCard from "@/components/dashboard/SalonCard"
+import Header from "@/components/layout/Header"
+
+import { useGetSalonsQuery } from "@/store/services/salonsApi"
 
 function CustomerDashboardContent() {
     const dispatch = useDispatch()
     const router = useRouter()
     const user = useSelector((state: RootState) => state.auth.user)
     const [isSignOutModalOpen, setIsSignOutModalOpen] = useState(false)
+
+    // Search and Filter State
+    const [searchQuery, setSearchQuery] = useState("")
+    const [locationFilter, setLocationFilter] = useState("")
+    const [debouncedSearch, setDebouncedSearch] = useState("")
+    const [debouncedLocation, setDebouncedLocation] = useState("")
+
+    // Simple debounce effect
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setDebouncedSearch(searchQuery)
+            setDebouncedLocation(locationFilter)
+        }, 500)
+        return () => clearTimeout(timer)
+    }, [searchQuery, locationFilter])
+
+    const { data: salons = [], isLoading, error } = useGetSalonsQuery({
+        name: debouncedSearch,
+        address: debouncedLocation
+    })
 
     const handleSignOut = () => {
         dispatch(logout())
@@ -23,113 +46,95 @@ function CustomerDashboardContent() {
 
     return (
         <div className="min-h-screen bg-white bg-nothing-grid font-sans text-slate-900">
-            {/* Header */}
-            <header className="border-b-2 border-input bg-white">
-                <div className="max-w-6xl mx-auto px-4 lg:px-8 py-4 flex items-center justify-between">
-                    <h1 className="text-2xl font-black tracking-tight flex items-center gap-2">
-                        <Icon name="spa" size="md" className="text-primary" />
-                        EzeQ
-                    </h1>
-                    <div className="flex items-center gap-6">
-                        <span className="text-sm font-medium hidden sm:inline-block">
-                            Welcome, <span className="font-bold">{user?.name || user?.email}</span>
-                        </span>
-                        <button
-                            onClick={() => setIsSignOutModalOpen(true)}
-                            className="flex items-center justify-center gap-2 rounded-sm border-2 border-input bg-white px-4 py-2 text-sm font-bold text-slate-900 transition-colors hover:border-black hover:bg-slate-50"
-                        >
-                            <Icon name="logout" size="sm" />
-                            Sign Out
-                        </button>
-                    </div>
-                </div>
-            </header>
+            {/* Reusable Header */}
+            <Header user={user} onSignOut={() => setIsSignOutModalOpen(true)} />
 
             {/* Main Content */}
             <main className="max-w-6xl mx-auto px-4 lg:px-8 py-10">
                 <div className="mb-10">
                     <h2 className="text-3xl font-black tracking-tight text-slate-900 mb-2">
-                        Your Dashboard
+                        Find Your Perfect Salon
                     </h2>
-                    <p className="text-lg text-slate-500 font-medium">Browse salons, book services, and manage your appointments.</p>
+                    <p className="text-lg text-slate-500 font-medium font-sans">Browse top-rated salons and book your next appointment.</p>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {/* Browse Salons */}
-                    <Link href="/salons" className="group block h-full">
-                        <div className="flex h-full flex-col justify-between rounded-none border-2 border-input bg-white p-6 transition-all hover:border-black hover:-translate-y-1">
-                            <div>
-                                <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-sm bg-black text-white group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
-                                    <Icon name="storefront" size="lg" />
-                                </div>
-                                <h3 className="mb-2 text-xl font-bold text-slate-900">Browse Salons</h3>
-                                <p className="text-slate-500 text-sm">
-                                    Find and explore top-rated salons, barbershops, and spas near you.
-                                </p>
-                            </div>
-                            <div className="mt-6 flex items-center text-sm font-bold text-slate-900 group-hover:text-primary transition-colors">
-                                View Salons <Icon name="arrow_forward" size="sm" className="ml-1" />
-                            </div>
+                {/* Search and Filters */}
+                <div className="mb-10 flex flex-col md:flex-row gap-4">
+                    <div className="relative flex-1">
+                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                            <Icon name="search" size="sm" />
                         </div>
-                    </Link>
-
-                    {/* My Appointments */}
-                    <Link href="/appointments" className="group block h-full">
-                        <div className="flex h-full flex-col justify-between rounded-none border-2 border-input bg-white p-6 transition-all hover:border-black hover:-translate-y-1">
-                            <div>
-                                <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-sm bg-slate-200 text-black group-hover:bg-black group-hover:text-white transition-colors">
-                                    <Icon name="event_note" size="lg" />
-                                </div>
-                                <h3 className="mb-2 text-xl font-bold text-slate-900">My Appointments</h3>
-                                <p className="text-slate-500 text-sm">
-                                    View your upcoming bookings, reschedule, or review past appointments.
-                                </p>
-                            </div>
-                            <div className="mt-6 flex items-center text-sm font-bold text-slate-900 group-hover:text-primary transition-colors">
-                                View Schedule <Icon name="arrow_forward" size="sm" className="ml-1" />
-                            </div>
+                        <input
+                            type="text"
+                            placeholder="Search salons by name..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="block w-full pl-10 pr-3 py-2 border-2 border-input bg-white font-bold text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-black focus:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] transition-all"
+                        />
+                    </div>
+                    <div className="relative flex-1">
+                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                            <Icon name="location_on" size="sm" />
                         </div>
-                    </Link>
-
-                    {/* Profile */}
-                    <Link href="/profile" className="group block h-full">
-                        <div className="flex h-full flex-col justify-between rounded-none border-2 border-input bg-white p-6 transition-all hover:border-black hover:-translate-y-1">
-                            <div>
-                                <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-sm bg-slate-100 text-slate-600 group-hover:bg-black group-hover:text-white transition-colors">
-                                    <Icon name="person" size="lg" />
-                                </div>
-                                <h3 className="mb-2 text-xl font-bold text-slate-900">My Profile</h3>
-                                <p className="text-slate-500 text-sm">
-                                    Manage your account settings, contact information, and preferences.
-                                </p>
-                            </div>
-                            <div className="mt-6 flex items-center text-sm font-bold text-slate-900 group-hover:text-primary transition-colors">
-                                Edit Profile <Icon name="arrow_forward" size="sm" className="ml-1" />
-                            </div>
-                        </div>
-                    </Link>
-                </div>
-
-                {/* Account Info Panel */}
-                <div className="mt-10 rounded-none border-2 border-input bg-white p-8">
-                    <h3 className="mb-6 text-xl font-bold text-slate-900">Account Details</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        <div className="flex flex-col">
-                            <span className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-1">Name</span>
-                            <span className="text-lg font-bold text-slate-900">{user?.name || "—"}</span>
-                        </div>
-                        <div className="flex flex-col">
-                            <span className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-1">Email Address</span>
-                            <span className="text-lg font-bold text-slate-900">{user?.email}</span>
-                        </div>
-                        <div className="flex flex-col">
-                            <span className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-1">Account Type</span>
-                            <span className="inline-flex max-w-fit items-center rounded-sm bg-black px-3 py-1 text-sm font-bold text-white">
-                                {user?.role || "CUSTOMER"}
-                            </span>
-                        </div>
+                        <input
+                            type="text"
+                            placeholder="Filter by location/address..."
+                            value={locationFilter}
+                            onChange={(e) => setLocationFilter(e.target.value)}
+                            className="block w-full pl-10 pr-3 py-2 border-2 border-input bg-white font-bold text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-black focus:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] transition-all"
+                        />
                     </div>
                 </div>
+
+                {isLoading ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {[1, 2, 3].map((n) => (
+                            <div key={n} className="h-80 w-full animate-pulse border-2 border-slate-100 bg-slate-50 rounded-none"></div>
+                        ))}
+                    </div>
+                ) : error ? (
+                    <div className="rounded-none border-2 border-red-200 bg-red-50 p-8 text-center">
+                        <Icon name="error" size="xl" className="text-red-400 mb-4" />
+                        <h3 className="text-xl font-bold text-red-900 mb-2">Something went wrong</h3>
+                        <p className="text-red-600 font-medium">Unable to load salons. Please try again later.</p>
+                        <button
+                            onClick={() => window.location.reload()}
+                            className="mt-6 font-bold text-red-900 underline hover:no-underline"
+                        >
+                            Try refreshing the page
+                        </button>
+                    </div>
+                ) : salons.length === 0 ? (
+                    <div className="rounded-none border-2 border-input bg-white p-12 text-center">
+                        <Icon name="search_off" size="xl" className="text-slate-200 mb-4" />
+                        <h3 className="text-xl font-bold text-slate-900 mb-2">No Salons Found</h3>
+                        <p className="text-slate-500 font-medium">We couldn't find any salons matching your search criteria.</p>
+                        {(searchQuery || locationFilter) && (
+                            <button
+                                onClick={() => {
+                                    setSearchQuery("")
+                                    setLocationFilter("")
+                                }}
+                                className="mt-4 font-bold text-primary underline hover:no-underline"
+                            >
+                                Clear all filters
+                            </button>
+                        )}
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {salons.map((salon) => (
+                            <SalonCard
+                                key={salon.id}
+                                id={salon.id}
+                                name={salon.name}
+                                address={salon.address}
+                                rating={salon.rating || 0}
+                                profileImage={salon.profileImage || undefined}
+                            />
+                        ))}
+                    </div>
+                )}
             </main>
 
             {/* Reusable Sign Out Modal */}

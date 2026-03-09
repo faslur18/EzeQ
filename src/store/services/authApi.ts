@@ -11,6 +11,9 @@ type RegisterResponse = { message: string };
 
 type UserProfile = { id: string; name: string; email: string; role: string; createdAt: string };
 
+type UpdateProfileRequest = { name?: string; email?: string; password?: string };
+type UpdateProfileResponse = { message: string; user: UserProfile };
+
 export const authApi = api.injectEndpoints({
     endpoints: (builder) => ({
         login: builder.mutation<LoginResponse, LoginRequest>({
@@ -23,7 +26,11 @@ export const authApi = api.injectEndpoints({
             query: () => '/auth/profile',
             providesTags: ['Profile'],
         }),
+        updateProfile: builder.mutation<UpdateProfileResponse, UpdateProfileRequest>({
+            query: (body) => ({ url: '/auth/profile', method: 'PUT', body }),
+            invalidatesTags: ['Profile'],
+        }),
     }),
 });
 
-export const { useLoginMutation, useRegisterMutation, useGetProfileQuery } = authApi;
+export const { useLoginMutation, useRegisterMutation, useGetProfileQuery, useUpdateProfileMutation } = authApi;
