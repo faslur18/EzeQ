@@ -2,19 +2,24 @@
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useSelector } from "react-redux";
+import { useDispatch } from "react-redux";
 import AuthGuard from "@/components/auth/AuthGuard";
 import AdminSidebar from "@/components/layout/admin-sidebar";
 import DashboardHeader from "@/components/layout/dashboard-header";
 import Icon from "@/components/ui/icon";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { RootState } from "@/store/store";
+import { logout } from "@/store/authSlice";
 import {
   useGetMySalonQuery,
   useUpdateSalonMutation,
 } from "@/store/services/salonsApi";
 
 function SalonProfileContent() {
+  const router = useRouter();
+  const dispatch = useDispatch();
   const token = useSelector((state: RootState) => state.auth.token);
   const {
     data: adminSalon,
@@ -105,7 +110,19 @@ function SalonProfileContent() {
 
   const errorStatus = (error as any)?.status;
   const isNotFound = isError && errorStatus === 404;
+  const isUnauthorized = isError && (errorStatus === 401 || errorStatus === 403);
   const isRequestError = isError && !isNotFound;
+
+  useEffect(() => {
+    if (isUnauthorized) {
+      dispatch(logout());
+      router.push("/auth/login");
+    }
+  }, [dispatch, isUnauthorized, router]);
+
+  if (isUnauthorized) {
+    return null;
+  }
 
   if (isRequestError) {
     return (
